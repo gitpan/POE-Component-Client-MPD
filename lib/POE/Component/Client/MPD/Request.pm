@@ -15,30 +15,23 @@
 #
 #
 
-package POE::Component::Client::MPD::Collection;
+package POE::Component::Client::MPD::Request;
 
 use strict;
 use warnings;
 
-use POE  qw[ Component::Client::MPD::Request ];
-use base qw[ Class::Accessor::Fast ];
+use Readonly;
 
+use base qw[ Class::Accessor::Fast Exporter ];
+__PACKAGE__->mk_accessors( qw[ answer error request _commands _cooking _from ] );
 
-#
-# event: pl:all_files()
-#
-# Return a mpd_result event with the list of all filenames (strings)
-# currently known by mpd.
-#
-sub _onpub_all_files {
-    my ($kernel) = $_[KERNEL];
-    my $req = POE::Component::Client::MPD::Request->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _commands => [ 'list filename' ],
-    } );
-    $kernel->yield( '_send', $req );
-}
+Readonly our $RAW         => 0; # data is to be returned raw
+Readonly our $AS_ITEMS    => 1; # data is to be returned as pococm-item
+Readonly our $AS_KV       => 2; # data is to be returned as kv (hash)
+Readonly our $STRIP_FIRST => 3; # data should have its first field stripped
+our @EXPORT = qw[ $RAW $AS_ITEMS $AS_KV $STRIP_FIRST ];
+
+#our ($VERSION) = '$Rev: 5645 $' =~ /(\d+)/;
 
 1;
 
@@ -46,10 +39,42 @@ __END__
 
 =head1 NAME
 
-POE::Component::Client::MPD::Collection - module handling collection commands
+POCOCM::Request - a request object to/from mpd
+
+
+=head1 SYNOPSIS
+
+    print $req->answer . "\n";
 
 
 =head1 DESCRIPTION
+
+C<POCOCM::Request> is more a placeholder for a hash ref with some pre-defined
+keys.
+
+
+=head1 PUBLIC METHODS
+
+This module has a C<new()> constructor, which should only be called by
+one of the C<POCOCM>'s modules.
+
+The other public methods are the following accessors:
+
+=over 4
+
+=item * data()
+
+The data returned by mpd, as an array reference.
+
+
+=item * error()
+
+Set if there was some error returned by mpd. Always assured to be C<undef>
+if everything went fine.
+
+
+=back
+
 
 
 =head1 SEE ALSO
@@ -62,8 +87,8 @@ L<http://rt.cpan.org/Public/Bug/Report.html?Queue=Audio-MPD>.
 
 POE::Component::Client::MPD development takes place on
 <audio-mpd@googlegroups.com>: feel free to join us.
-(use L<http://groups.google.com/group/audio-mpd> to sign in). Our subversion
-repository is located at L<https://svn.musicpd.org>.
+(use L<http://groups.google.com/group/audio-mpd> to sign in). Our
+subversion repository is located at L<https://svn.musicpd.org>.
 
 
 =head1 AUTHOR
@@ -87,3 +112,4 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 =cut
+

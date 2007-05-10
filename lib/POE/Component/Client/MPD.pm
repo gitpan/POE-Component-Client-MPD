@@ -28,7 +28,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.0.3';
+our $VERSION = '0.1.0';
 
 
 sub spawn {
@@ -119,11 +119,8 @@ sub _connected {
 
 
 sub _onprot_got_data {
-    my ($h, $data) = @_[HEAP, ARG0];
-    my $args = shift @{ $h->{fifo} };
-    $args->{data} = $data;
-    #print "mpd got data for " . $args->{from} . "\n";
-    $_[KERNEL]->post( $args->{from}, 'mpd_result', $args );
+    my $req = $_[ARG0];
+    $_[KERNEL]->post( $req->_from, 'mpd_result', $req );
 }
 
 
@@ -134,7 +131,8 @@ sub _onprot_got_data {
 # Store it for later usage if needed.
 #
 sub _onprot_got_mpd_version {
-    $_[HEAP]->{version} = $_[ARG0];
+    # FIXME
+    #$_[HEAP]->{version} = $_[ARG0]->answer->[0];
 }
 
 
@@ -149,9 +147,7 @@ sub _onprot_got_mpd_version {
 # terminated (it's handled via the poe::filter).
 #
 sub _onpriv_send {
-    my ($k, $h, $args) = @_[KERNEL, HEAP, ARG0];
-    push @{ $h->{fifo} }, $args;
-    $k->post( $h->{_socket}, 'send', @{ $args->{commands} } );
+    $_[KERNEL]->post( $_[HEAP]->{_socket}, 'send', $_[ARG0] );
 }
 
 
