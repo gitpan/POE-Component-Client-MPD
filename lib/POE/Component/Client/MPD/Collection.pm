@@ -20,22 +20,23 @@ package POE::Component::Client::MPD::Collection;
 use strict;
 use warnings;
 
-use POE  qw[ Component::Client::MPD::Request ];
+use POE  qw[ Component::Client::MPD::Message ];
 use base qw[ Class::Accessor::Fast ];
 
 
 #
-# event: pl:all_files()
+# event: pl.all_files()
 #
 # Return a mpd_result event with the list of all filenames (strings)
 # currently known by mpd.
 #
 sub _onpub_all_files {
     my ($kernel) = $_[KERNEL];
-    my $req = POE::Component::Client::MPD::Request->new( {
+    my $req = POE::Component::Client::MPD::Message->new( {
         _from     => $_[SENDER]->ID,
         _request  => $_[STATE],
         _commands => [ 'list filename' ],
+        _cooking  => $STRIP_FIRST,
     } );
     $kernel->yield( '_send', $req );
 }

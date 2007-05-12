@@ -30,18 +30,18 @@ use Test::More;
 our $nbtests = 2;
 our @tests   = (
     # [ 'event', [ $arg1, $arg2, ... ], \&sub_checking_results ]
-    [ 'coll:all_files', [], \&check_all_files ],
+    [ 'coll.all_files', [], \&check_all_files ],
 );
 
 
 # are we able to test module?
 eval 'use POE::Component::Client::MPD::Test';
-diag($@),plan skip_all => $@ if $@ =~ s/\n+Compilation failed.*//s;
+plan skip_all => $@ if $@ =~ s/\n+Compilation failed.*//s;
 
 
 
 sub check_all_files {
-    my $list = $_[0]->answer;
+    my $list = $_[0]->data;
     is( scalar @$list, 4, 'all_files return the pathes' );
     like( $list->[0], qr/\.ogg$/, 'all_files return strings' );
 }

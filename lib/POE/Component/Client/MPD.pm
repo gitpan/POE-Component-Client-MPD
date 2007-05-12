@@ -28,7 +28,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 
 sub spawn {
@@ -52,11 +52,11 @@ sub spawn {
 #                 '_got_mpd_version',
 #                 ],
             $collection => {
-                'coll:all_files' => '_onpub_all_files',
+                'coll.all_files' => '_onpub_all_files',
             },
             $playlist   => {
-                'pl:add'         => '_onpub_add',
-                'pl:delete'      => '_onpub_delete',
+                'pl.add'         => '_onpub_add',
+                'pl.delete'      => '_onpub_delete',
             },
         ],
     );

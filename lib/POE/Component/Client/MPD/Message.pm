@@ -15,7 +15,7 @@
 #
 #
 
-package POE::Component::Client::MPD::Request;
+package POE::Component::Client::MPD::Message;
 
 use strict;
 use warnings;
@@ -23,7 +23,7 @@ use warnings;
 use Readonly;
 
 use base qw[ Class::Accessor::Fast Exporter ];
-__PACKAGE__->mk_accessors( qw[ answer error request _commands _cooking _from ] );
+__PACKAGE__->mk_accessors( qw[ data error request _commands _cooking _from ] );
 
 Readonly our $RAW         => 0; # data is to be returned raw
 Readonly our $AS_ITEMS    => 1; # data is to be returned as pococm-item
@@ -39,17 +39,17 @@ __END__
 
 =head1 NAME
 
-POCOCM::Request - a request object to/from mpd
+POE::Component::Client::MPD::Message - a message from POCOCM
 
 
 =head1 SYNOPSIS
 
-    print $req->answer . "\n";
+    print $msg->data . "\n";
 
 
 =head1 DESCRIPTION
 
-C<POCOCM::Request> is more a placeholder for a hash ref with some pre-defined
+C<POCOCM::Message> is more a placeholder for a hash ref with some pre-defined
 keys.
 
 
