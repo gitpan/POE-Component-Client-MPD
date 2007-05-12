@@ -21,14 +21,17 @@ use strict;
 use warnings;
 
 use POE;
+use POE::Component::Client::MPD::Item;
 use POE::Component::Client::MPD::Message;
 use POE::Component::Client::TCP;
 use Readonly;
 
 
+Readonly my $FALSE => 0;
+Readonly my $TRUE  => 1;
+
 Readonly my $IGNORE    => 0;
 Readonly my $RECONNECT => 1;
-
 
 #
 # my $id = POE::Component::Client::MPD::Connection->spawn( \%params )
@@ -55,10 +58,11 @@ sub spawn {
         Filter        => 'POE::Filter::Line',
         Args          => [ $args->{id} ],
 
-        ConnectError => sub { }, # quiet errors - FIXME: implement!
+
         ServerError  => sub { }, # quiet errors
         Started      => \&_onpriv_Started,
         Connected    => \&_onpriv_Connected,
+        ConnectError => \&_onpriv_ConnectError,
         Disconnected => \&_onpriv_Disconnected,
         ServerInput  => \&_onpriv_ServerInput,
 
@@ -94,16 +98,17 @@ sub _onprot_disconnect {
 
 
 #
-# event: send( $request )
+# event: send( $message )
 #
-# Request pococm-conn to send the $request over the wires. Note that this
-# request is a pococm-request object, and that the ->_commands should
-# *not* be newline terminated.
+# Request pococm-conn to send the commands of $message over the wires.
+# Note that $message is a pococm-message object, and that the ->_commands
+# should *not* be newline terminated.
 #
 sub _onprot_send {
+    my ($h, $msg) = @_[HEAP, ARG0];
     # $_[HEAP]->{server} is a reserved slot of pococ-tcp.
-    $_[HEAP]->{server}->put( @{ $_[ARG0]->_commands } );
-    $_[HEAP]->{message} = $_[ARG0];
+    $h->{server}->put( @{ $msg->_commands } );
+    push @{ $h->{fifo} }, $msg;
 }
 
 
@@ -118,8 +123,9 @@ sub _onprot_send {
 # peer during the life of this session.
 #
 sub _onpriv_Started {
-    $_[HEAP]{session}     = $_[ARG0];       # poe-session peer
-    $_[HEAP]{on_disconnect} = $RECONNECT;   # disconnect policy
+    my $h = $_[HEAP];
+    $h->{session}       = $_[ARG0];     # poe-session peer
+    $h->{on_disconnect} = $RECONNECT;   # disconnect policy
 }
 
 
@@ -129,7 +135,29 @@ sub _onpriv_Started {
 # Called whenever the tcp connection is established.
 #
 sub _onpriv_Connected {
-    $_[HEAP]->{incoming} = [];   # reset incoming data
+    my $h = $_[HEAP];
+    $h->{fifo}     = [];     # current messages
+    $h->{incoming} = [];     # reset incoming data
+    $h->{is_mpd}   = $FALSE; # is remote server a mpd sever?
+}
+
+
+#
+# event: ConnectError($syscall, $errno, $errstr)
+#
+# Called whenever the tcp connection fails to be established. Receives
+# the $syscall that failed, as well as $errno and $errstr.
+#
+sub _onpriv_ConnectError {
+    my ($syscall, $errno, $errstr) = @_[ARG0, ARG1, ARG2];
+
+    my $session = $_[HEAP]{session};
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        error   => "$syscall: ($errno) $errstr",
+        request => 'connect',
+        _from   => $session,
+    } );
+    $_[KERNEL]->post( $session, '_mpd_error', $msg );
 }
 
 
@@ -151,15 +179,36 @@ sub _onpriv_Disconnected {
 # transmitted given as param.
 #
 sub _onpriv_ServerInput {
-    my $input = $_[ARG0];
+    my ($h, $input) = @_[HEAP, ARG0];
+
+    # did we check we were talking to a mpd server?
+    if ( not $h->{is_mpd} ) {
+        # we did not had the chance to check if it's a mpd server: let's do it.
+        my $k = $_[KERNEL];
+
+        if ( $input =~ /^OK MPD (.*)$/ ) {
+            $h->{is_mpd} = $TRUE;  # remote server *is* a mpd sever
+            $k->yield( '_ServerInput_mpd_version', $1 );
+        } else {
+            # oops, it appears that it's not a mpd server...
+            my $error = POE::Component::Client::MPD::Message->new( {
+                error   => "Not a mpd server - welcome string was: $input",
+                request => 'connect',
+                _from   => $h->{session},
+            } );
+            $k->post( $h->{session}, '_mpd_error', $error );
+        }
+
+        return;
+    }
+
 
     # table of dispatch: check input against regex, and fire event
     # if it did match.
     my @dispatch = (
-        [ qr/^OK$/,          '_ServerInput_data_eot'    ],
-        [ qr/^OK MPD (.*)$/, '_ServerInput_mpd_version' ],
-        [ qr/^ACK/,          '_ServerInput_error'       ],
-        [ qr/^/,             '_ServerInput_data'        ],
+        [ qr/^OK$/,        '_ServerInput_data_eot' ],
+        [ qr/^ACK (.*)/,   '_ServerInput_error'    ],
+        [ qr/^/,           '_ServerInput_data'     ],
     );
 
     foreach my $d (@dispatch) {
@@ -179,20 +228,53 @@ sub _onpriv_ServerInput_data {
     my ($h, $input) = @_[HEAP, ARG0];
 
     # regular data, to be cooked (if needed) and stored.
-    my $cooking = $h->{message}->_cooking;
+    my $msg = $h->{fifo}[0];
+    my $cooking = $msg->_cooking;
     COOKING:
     {
-        last COOKING if $cooking == $RAW;
+        $cooking == $RAW and do {
+            # nothing to do, just push the data.
+            push @{ $h->{incoming} }, $input;
+            last COOKING;
+        };
+
+        $cooking == $AS_ITEMS and do {
+            # Lots of POCOCM methods are sending commands and then parse the
+            # output to build a pococm-item.
+            my ($k,$v) = split /:\s+/, $input, 2;
+            $k = lc $k;
+
+            if ( $k eq 'file' || $k eq 'directory' || $k eq 'playlist' ) {
+                # build a new pococm-item
+                my $item = POE::Component::Client::MPD::Item->new( $k => $v );
+                push @{ $h->{incoming} }, $item;
+                last COOKING;
+            }
+
+            # just complete the current pococm-item
+            $h->{incoming}[-1]->$k($v);
+            last COOKING;
+        };
+
+        $cooking == $AS_KV and do {
+            # Lots of POCOCM methods are sending commands and then parse the
+            # output to get a list of key / value (with the colon ":" acting
+            # as separator).
+            my @data = split(/:\s+/, $input, 2);
+            push @{ $h->{incoming} }, @data;
+            last COOKING;
+        };
 
         $cooking == $STRIP_FIRST and do {
             # Lots of POCOCM methods are sending commands and then parse the
             # output to remove the first field (with the colon ":" acting as
             # separator).
             $input = ( split(/:\s+/, $input, 2) )[1];
+            push @{ $h->{incoming} }, $input;
             last COOKING;
         };
     }
-    push @{ $h->{incoming} }, $input;
+
 }
 
 
@@ -204,21 +286,22 @@ sub _onpriv_ServerInput_data {
 sub _onpriv_ServerInput_data_eot {
     my ($k, $h) = @_[KERNEL, HEAP];
     my $session = $h->{session};
-    my $msg     = $h->{message};
+    my $msg     = shift @{ $h->{fifo} };    # remove completed msg
     $msg->data( $h->{incoming} );           # complete message with data
-    $k->post($session, '_got_data', $msg);  # signal poe session
+    $k->post($session, '_mpd_data', $msg);  # signal poe session
     $h->{incoming} = [];                    # reset incoming data
 }
 
 
 #
-# event: _ServerInput_mpd_version(undef, $version)
+# event: _ServerInput_mpd_version($version)
 #
 # Called just after the connection, with mpd's $version.
 #
 sub _onpriv_ServerInput_mpd_version {
-    my $session = $_[HEAP]->{session};
-    $_[KERNEL]->post($session, '_got_mpd_version', $_[ARG1]);
+    my $h = $_[HEAP];
+    my $session  = $h->{session};
+    $_[KERNEL]->post($session, '_mpd_version', $_[ARG0]);
 }
 
 
@@ -228,7 +311,11 @@ sub _onpriv_ServerInput_mpd_version {
 # Called when a message resulted in an $error for mpd.
 #
 sub _onpriv_ServerInput_error {
-    # FIXME: implement
+    my $h = $_[HEAP];
+    my $session = $h->{session};
+    my $msg     = shift @{ $h->{fifo} };
+    $msg->error( $_[ARG1] );
+    $_[KERNEL]->post($session, '_mpd_error', $msg);
 }
 
 

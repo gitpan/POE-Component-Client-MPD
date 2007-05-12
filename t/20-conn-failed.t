@@ -1,6 +1,6 @@
 #!perl
 #
-# This file is part of POE::Component::Client::MPD.
+# This file is part of Audio::MPD.
 # Copyright (c) 2007 Jerome Quelin <jquelin@cpan.org>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -22,17 +22,30 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9;
+use POE qw[ Component::Client::MPD::Connection ];
+use Test::More;
+plan tests => 1;
 
-BEGIN { use_ok( 'POE::Component::Client::MPD' ); }
-my $version = $POE::Component::Client::MPD::VERSION;
-diag( "Testing POE::Component::Client::MPD $version, Perl $], $^X" );
+my $id = POE::Session->create(
+    inline_states => {
+        _start     => \&_onpriv_start,
+        _mpd_error => \&_onpriv_mpd_error,
+    }
+);
+POE::Component::Client::MPD::Connection->spawn( {
+    host => 'localhost',
+    port => 16600,
+    id   => $id,
+} );
+POE::Kernel->run;
+exit;
 
-use_ok( 'POE::Component::Client::MPD::Item::Directory' );
-use_ok( 'POE::Component::Client::MPD::Item::Playlist' );
-use_ok( 'POE::Component::Client::MPD::Item::Song' );
-use_ok( 'POE::Component::Client::MPD::Item' );
-use_ok( 'POE::Component::Client::MPD::Message' );
-use_ok( 'POE::Component::Client::MPD::Collection' );
-use_ok( 'POE::Component::Client::MPD::Connection' );
-use_ok( 'POE::Component::Client::MPD::Playlist' );
+
+sub _onpriv_start {
+    $_[KERNEL]->alias_set('tester'); # increment refcount
+}
+
+sub _onpriv_mpd_error  {
+    like( $_[ARG0]->error, qr/^connect: \(\d+\) /, 'connect error trapped' );
+}
+
