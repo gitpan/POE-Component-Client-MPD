@@ -23,6 +23,7 @@ use warnings;
 use POE;
 use POE::Component::Client::MPD::Message;
 use POE::Component::Client::MPD::Stats;
+use POE::Component::Client::MPD::Status;
 use base qw[ Class::Accessor::Fast ];
 
 # -- MPD interaction: general commands
@@ -119,14 +120,140 @@ sub _onpriv_stats_postback {
 }
 
 
+#
+# event: status()
+#
+# Return a hash with the current status of MPD.
+#
+sub _onpub_status {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ 'status' ],
+        _cooking  => $AS_KV,
+        _post     => '_status_postback',
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: _status_postback( $msg )
+#
+# Transform $msg->data from hash to a POCOCM::Status object with the current
+# status of MPD.
+#
+sub _onpriv_status_postback {
+    my $msg   = $_[ARG0];
+    my %stats = @{ $msg->data };
+    my $stats = POE::Component::Client::MPD::Status->new( \%stats );
+    $msg->data($stats);
+    $_[KERNEL]->yield( '_mpd_data', $msg );
+}
+
+
+#
+# event: current()
+#
+# Return a POCOCM::Item::Song representing the song currently playing.
+#
+sub _onpub_current {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ 'currentsong' ],
+        _cooking  => $AS_ITEMS,
+        _post     => '_post_array2scalar',
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 # -- MPD interaction: altering settings
 # -- MPD interaction: controlling playback
+
+#
+# event: play( [$song] )
+#
+# Begin playing playlist at song number $song. If no argument supplied,
+# resume playing.
+#
+sub _onpub_play {
+    my $number = defined $_[ARG0] ? $_[ARG0] : '';
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "play $number" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: playid( [$song] )
+#
+# Begin playing playlist at song ID $song. If no argument supplied,
+# resume playing.
+#
+sub _onpub_playid {
+    my $number = defined $_[ARG0] ? $_[ARG0] : '';
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "playid $number" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: pause( [$sate] )
+#
+# Pause playback. If $state is 0 then the current track is unpaused, if
+# $state is 1 then the current track is paused.
+#
+# Note that if $state is not given, pause state will be toggled.
+#
+sub _onpub_pause {
+    my $state = defined $_[ARG0] ? $_[ARG0] : '';
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "pause $state" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: stop()
+#
+# Stop playback
+#
+sub _onpub_stop {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ 'stop' ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
 
 #
 # event: next()
 #
 # Play next song in playlist.
-# No return event.
 #
 sub _onpub_next {
     my $msg = POE::Component::Client::MPD::Message->new( {
@@ -138,6 +265,24 @@ sub _onpub_next {
     } );
     $_[KERNEL]->yield( '_send', $msg );
 }
+
+
+#
+# event: prev()
+#
+# Play previous song in playlist.
+#
+sub _onpub_prev {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ 'previous' ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
 
 1;
 
