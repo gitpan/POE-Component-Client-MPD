@@ -23,13 +23,23 @@ use warnings;
 use Readonly;
 
 use base qw[ Class::Accessor::Fast Exporter ];
-__PACKAGE__->mk_accessors( qw[ data error request _commands _cooking _from ] );
+__PACKAGE__->mk_accessors( qw[
+    data error request _answer _commands _cooking _from
+] );
 
+
+# constants for _answer
+Readonly our $SEND    => 0;
+Readonly our $DISCARD => 1;
+
+# constants for _cooking
 Readonly our $RAW         => 0; # data is to be returned raw
 Readonly our $AS_ITEMS    => 1; # data is to be returned as pococm-item
 Readonly our $AS_KV       => 2; # data is to be returned as kv (hash)
 Readonly our $STRIP_FIRST => 3; # data should have its first field stripped
-our @EXPORT = qw[ $RAW $AS_ITEMS $AS_KV $STRIP_FIRST ];
+
+our @EXPORT = qw[ $SEND $DISCARD
+                  $RAW $AS_ITEMS $AS_KV $STRIP_FIRST ];
 
 #our ($VERSION) = '$Rev: 5645 $' =~ /(\d+)/;
 
@@ -79,27 +89,19 @@ if everything went fine.
 
 =head1 SEE ALSO
 
-You can find more information on the mpd project on its homepage at
-L<http://www.musicpd.org>, or its wiki L<http://mpd.wikia.com>.
-
-Regarding this Perl module, you can report bugs on CPAN via
-L<http://rt.cpan.org/Public/Bug/Report.html?Queue=Audio-MPD>.
-
-POE::Component::Client::MPD development takes place on
-<audio-mpd@googlegroups.com>: feel free to join us.
-(use L<http://groups.google.com/group/audio-mpd> to sign in). Our
-subversion repository is located at L<https://svn.musicpd.org>.
+For all related information (bug reporting, mailing-list, pointers to
+MPD and POE, etc.), refer to C<POE::Component::Client::MPD>'s pod,
+section C<SEE ALSO>
 
 
 =head1 AUTHOR
 
-Jerome Quelin <jquelin@cpan.org>
+Jerome Quelin, C<< <jquelin at cpan.org> >>
 
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT & LICENSE
 
-Copyright (c) 2007 Jerome Quelin <jquelin@cpan.org>
-
+Copyright 2007 Jerome Quelin, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -111,5 +113,8 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-=cut
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
+=cut

@@ -20,8 +20,10 @@ package POE::Component::Client::MPD::Test;
 use strict;
 use warnings;
 
-use FindBin     qw[ $Bin ];
-use POE         qw[ Component::Client::MPD ];
+use FindBin qw[ $Bin ];
+use POE;
+use POE::Component::Client::MPD;
+use POE::Component::Client::MPD::Message;
 use Readonly;
 use Test::More;
 
@@ -182,6 +184,10 @@ sub _onpub_next_test {
     my $event = $::tests[0][0];
     my $args  = $::tests[0][1];
     $k->post( 'mpd', $event, @$args );
+
+    return unless $::tests[0][2] == $DISCARD;
+    shift @::tests;
+    $k->yield( 'next_test' );
 }
 
 
@@ -191,7 +197,7 @@ sub _onpub_next_test {
 # Called when mpd talks back, with $msg as a pococm-message param.
 #
 sub _onpub_mpd_result {
-    $::tests[0][2]->( $_[ARG0] );      # check if everything went fine
+    $::tests[0][3]->( $_[ARG0] );      # check if everything went fine
     shift @::tests;                    # remove test being played
     $_[KERNEL]->yield( 'next_test' );  # call next test
 }
@@ -279,14 +285,21 @@ by $port if specified, 6600 otherwise (MPD default).
 This might be useful when trying to test connections with mpd server.
 
 
+=head1 SEE ALSO
+
+For all related information (bug reporting, mailing-list, pointers to
+MPD and POE, etc.), refer to C<POE::Component::Client::MPD>'s pod,
+section C<SEE ALSO>
+
+
 =head1 AUTHOR
 
 Jerome Quelin, C<< <jquelin at cpan.org> >>
 
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT & LICENSE
 
-Copyright (c) 2007 Jerome Quelin
+Copyright 2007 Jerome Quelin, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -297,5 +310,9 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 =cut

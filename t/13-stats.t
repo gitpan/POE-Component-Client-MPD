@@ -19,7 +19,29 @@
 #
 #
 
-use Test::More;
-eval 'use Test::Pod 1.00';
-plan skip_all => 'Test::Pod 1.00 required for testing POD' if $@;
-all_pod_files_ok();
+use strict;
+use warnings;
+
+use POE::Component::Client::MPD::Stats;
+use Test::More tests => 8;
+
+
+my %kv = (
+    artists     => 3,
+    albums      => 2,
+    songs       => 4,
+    uptime      => 10002,
+    playtime    => 5,
+    db_playtime => 8,
+    db_update   => 1175631570,
+);
+
+my $s = POE::Component::Client::MPD::Stats->new( \%kv );
+isa_ok( $s, 'POE::Component::Client::MPD::Stats', 'object creation' );
+is( $s->artists,     3,          'accessor: artists' );
+is( $s->albums,      2,          'accessor: albums' );
+is( $s->songs,       4,          'accessor: songs' );
+is( $s->uptime,      10002,      'accessor: uptime' );
+is( $s->playtime,    5,          'accessor: playtime' );
+is( $s->db_playtime, 8,          'accessor: db_playtime' );
+is( $s->db_update,   1175631570, 'accessor: db_update' );

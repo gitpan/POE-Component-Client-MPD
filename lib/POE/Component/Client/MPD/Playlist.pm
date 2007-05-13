@@ -23,6 +23,8 @@ use warnings;
 use POE;
 use base qw[ Class::Accessor::Fast ];
 
+# -- Playlist: retrieving information
+# -- Playlist: adding / removing songs
 
 #
 # event: pl:add( $path, $path, ... )
@@ -73,6 +75,9 @@ sub _onpub_delete {
 }
 
 
+# -- Playlist: changing playlist order
+# -- Playlist: managing playlists
+
 1;
 
 __END__
@@ -84,30 +89,41 @@ POE::Component::Client::MPD::Playlist - module handling playlist commands
 
 =head1 DESCRIPTION
 
+C<POCOCM::Playlist> is responsible for handling playlist-related commands.
+To achieve those commands, send the corresponding event to the POCOCM
+session you created: it will be responsible for dispatching the event
+where it is needed.
+
+
+=head1 PUBLIC EVENTS
+
+The following is a list of general purpose events accepted by POCOCM.
+
+
+=head2 Retrieving information
+
+=head2 Adding / removing songs
+
+=head2 Changing playlist order
+
+=head2 Managing playlists
+
 
 =head1 SEE ALSO
 
-You can find more information on the mpd project on its homepage at
-L<http://www.musicpd.org>, or its wiki L<http://mpd.wikia.com>.
-
-Regarding this Perl module, you can report bugs on CPAN via
-L<http://rt.cpan.org/Public/Bug/Report.html?Queue=Audio-MPD>.
-
-POE::Component::Client::MPD development takes place on
-<audio-mpd@googlegroups.com>: feel free to join us.
-(use L<http://groups.google.com/group/audio-mpd> to sign in). Our subversion
-repository is located at L<https://svn.musicpd.org>.
+For all related information (bug reporting, mailing-list, pointers to
+MPD and POE, etc.), refer to C<POE::Component::Client::MPD>'s pod,
+section C<SEE ALSO>
 
 
 =head1 AUTHOR
 
-Jerome Quelin <jquelin@cpan.org>
+Jerome Quelin, C<< <jquelin at cpan.org> >>
 
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT & LICENSE
 
-Copyright (c) 2007 Jerome Quelin <jquelin@cpan.org>
-
+Copyright 2007 Jerome Quelin, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -118,5 +134,9 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 =cut

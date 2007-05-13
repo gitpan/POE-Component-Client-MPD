@@ -22,42 +22,70 @@ use warnings;
 
 use POE;
 use POE::Component::Client::MPD::Collection;
+use POE::Component::Client::MPD::Commands;
 use POE::Component::Client::MPD::Connection;
+use POE::Component::Client::MPD::Message;
 use POE::Component::Client::MPD::Playlist;
 use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.1.2';
+our $VERSION = '0.2.0';
 
 
+#
+# my $id = spawn( \%params )
+#
+# This method will create a POE session responsible for communicating
+# with mpd. It will return the poe id of the session newly created.
+#
+# You can tune the pococm by passing some arguments as a hash reference,
+# where the hash keys are:
+#   - host: the hostname of the mpd server. If none given, defaults to
+#     MPD_HOST env var. If this var isn't set, defaults to localhost.
+#   - port: the port of the mpd server. If none given, defaults to
+#     MPD_PORT env var. If this var isn't set, defaults to 6600.
+#   - password: the password to sent to mpd to authenticate the client.
+#     If none given, defaults to C<MPD_PASSWORD> env var. If this var
+#     isn't set, defaults to empty string.
+#   - alias: an optional string to alias the newly created POE session.
+#
 sub spawn {
     my ($type, $args) = @_;
 
     my $collection = POE::Component::Client::MPD::Collection->new;
+    my $commands   = POE::Component::Client::MPD::Commands->new;
     my $playlist   = POE::Component::Client::MPD::Playlist->new;
 
     my $session = POE::Session->create(
         args          => [ $args ],
         inline_states => {
+            # private events
             '_start'       => \&_onpriv_start,
             '_send'        => \&_onpriv_send,
+            # protected events
             '_mpd_data'    => \&_onprot_mpd_data,
             '_mpd_error'   => \&_onprot_mpd_error,
             '_mpd_version' => \&_onprot_mpd_version,
+            # public events
             'disconnect'   => \&_onpub_disconnect,
         },
         object_states => [
-#             $self => [
-#                 '_connected',
-#                 '_got_mpd_version',
-#                 ],
-            $collection => {
-                'coll.all_files' => '_onpub_all_files',
+            $commands   => { # general purpose commands
+                'volume'         => '_onpub_volume',
+                'output_enable'  => '_onpub_output_enable',
+                'output_disable' => '_onpub_output_disable',
+
+                'stats'          => '_onpub_stats',
+
+                'next'           => '_onpub_next',
             },
-            $playlist   => {
-                'pl.add'         => '_onpub_add',
-                'pl.delete'      => '_onpub_delete',
+            $collection => { # collection related commands
+                'coll.all_files'  => '_onpub_all_files',
+            },
+            $playlist   => { # playlist related commands
+                'pl.add'          => '_onpub_add',
+                'pl.delete'       => '_onpub_delete',
             },
         ],
     );
@@ -66,6 +94,9 @@ sub spawn {
 }
 
 
+#--
+# public events
+
 #
 # event: disconnect()
 #
@@ -73,11 +104,50 @@ sub spawn {
 #
 sub _onpub_disconnect {
     my ($k,$h) = @_[KERNEL, HEAP];
-    $k->alias_remove( $h->{alias} ) if defined $h->{alias};
-    $k->post( $h->{_socket}, 'disconnect' );
+    $k->alias_remove( $h->{alias} ) if defined $h->{alias}; # refcount--
+    $k->post( $h->{_socket}, 'disconnect' );                # pococm-conn
 }
 
 
+#--
+# protected events.
+
+#
+# Event: _mpd_data( $msg )
+#
+# Received when mpd finished to send back some data.
+#
+sub _onprot_mpd_data {
+    my $msg = $_[ARG0];
+    return if $msg->_answer == $DISCARD;
+    $_[KERNEL]->post( $msg->_from, 'mpd_result', $msg );
+}
+
+sub _onprot_mpd_error {
+    warn "mpd error\n";
+}
+
+
+#
+# Event: _mpd_version( $vers )
+#
+# Event received during connection, when mpd server sends its version.
+# Store it for later usage if needed.
+#
+sub _onprot_mpd_version {
+    $_[HEAP]->{version} = $_[ARG0];
+}
+
+
+#--
+# private events
+
+#
+# Event: _start( \%params )
+#
+# Called when the poe session gets initialized. Receive a reference
+# to %params, same as spawn() received.
+#
 sub _onpriv_start {
     my ($h, $args) = @_[HEAP, ARG0];
 
@@ -99,6 +169,7 @@ sub _onpriv_start {
     $h->{_socket}  = POE::Component::Client::MPD::Connection->spawn(\%params);
 }
 
+
 =begin FIXME
 
 #
@@ -119,36 +190,11 @@ sub _connected {
 
 
 
-sub _onprot_mpd_data {
-    my $req = $_[ARG0];
-    $_[KERNEL]->post( $req->_from, 'mpd_result', $req );
-}
-
-sub _onprot_mpd_error {
-    warn "mpd error\n";
-}
-
 #
-# _got_mpd_version( $vers )
+# event: _send( $msg )
 #
-# Event sent during connection, when mpd server sends its version.
-# Store it for later usage if needed.
-#
-sub _onprot_mpd_version {
-    # FIXME
-    #$_[HEAP]->{version} = $_[ARG0]->answer->[0];
-}
-
-
-#
-# {
-#   from    => $id,
-#   state   => $state,
-#   command => [ $cmd, ... ],
-# }
-#
-# send data over tcp to mpd server. note that $data should not be newline
-# terminated (it's handled via the poe::filter).
+# Event received to request message sending over tcp to mpd server.
+# $msg is a pococm-message partially filled.
 #
 sub _onpriv_send {
     $_[KERNEL]->post( $_[HEAP]->{_socket}, 'send', $_[ARG0] );
@@ -168,13 +214,12 @@ POE::Component::Client::MPD - a full-blown mpd client library
 =head1 SYNOPSIS
 
     use POE qw[ Component::Client::MPD ];
-    POE::Component::Client::MPD->spawn(
-        { host     => 'localhost',
-          port     => 6600,
-          password => 's3kr3t',  # mpd password
-          alias    => 'mpd',     # poe alias
-        }
-    );
+    POE::Component::Client::MPD->spawn( {
+        host     => 'localhost',
+        port     => 6600,
+        password => 's3kr3t',  # mpd password
+        alias    => 'mpd',     # poe alias
+    } );
 
     # ... later on ...
     $_[KERNEL]->post( 'mpd', 'next' );
@@ -182,15 +227,12 @@ POE::Component::Client::MPD - a full-blown mpd client library
 
 =head1 DESCRIPTION
 
-POE::Component::Client::MPD is a perl mpd client, sitting on top of the POE
-framework.
+POCOCM gives a clear message-passing interface (sitting on top of POE)
+for talking to and controlling MPD (Music Player Daemon) servers. A
+connection to the MPD server is established as soon as a new POCOCM
+object is created.
 
-Audio::MPD gives a clear object-oriented interface for talking to and
-controlling MPD (Music Player Daemon) servers. A connection to the MPD
-server is established as soon as a new Audio::MPD object is created.
-Commands are then sent to the server as the class's methods are called.
-
-
+Commands are then sent to the server as messages are passed.
 
 
 =head1 PUBLIC PACKAGE METHODS
@@ -200,7 +242,7 @@ Commands are then sent to the server as the class's methods are called.
 This method will create a POE session responsible for communicating with mpd.
 It will return the poe id of the session newly created.
 
-You can tune the pococ by passing some arguments as a hash reference, where
+You can tune the pococm by passing some arguments as a hash reference, where
 the hash keys are:
 
 =over 4
@@ -231,6 +273,27 @@ An optional string to alias the newly created POE session.
 =back
 
 
+=head1 PUBLIC EVENTS
+
+For a list of public events that you can send to a POCOCM session, check:
+
+=over 4
+
+=item *
+
+C<POCOCM::Commands> for general commands
+
+=item *
+
+C<POCOCM::Playlist> for playlist-related commands
+
+=item *
+
+C<POCOCM::Collection> for collection-related commands
+
+=back
+
+
 =head1 BUGS
 
 Please report any bugs or feature requests to C<bug-poe-component-client-mpd at
@@ -245,8 +308,8 @@ your bug as I make changes.
 You can find more information on the mpd project on its homepage at
 L<http://www.musicpd.org>, or its wiki L<http://mpd.wikia.com>.
 
-POE::Component::Client::MPD development takes place on C<< <audio-mpd at
-googlegroups.com> >>: feel free to join us. (use
+C<POE::Component::Client::MPD development> takes place on C<< <audio-mpd
+at googlegroups.com> >>: feel free to join us. (use
 L<http://groups.google.com/group/audio-mpd> to sign in). Our subversion
 repository is located at L<https://svn.musicpd.org>.
 
@@ -268,7 +331,6 @@ L<http://cpanratings.perl.org/d/POE-Component-Client-MPD>
 L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=POE-Component-Client-MPD>
 
 =back
-
 
 
 =head1 AUTHOR

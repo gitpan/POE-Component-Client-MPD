@@ -1,7 +1,7 @@
 #!perl
 #
-# This file is part of Audio::MPD.
-# Copyright (c) 2007 Jerome Quelin <jquelin@cpan.org>
+# This file is part of POE::Component::Client::MPD.
+# Copyright (c) 2007 Jerome Quelin, all rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,15 +22,15 @@
 use strict;
 use warnings;
 
-use POE;
+use POE qw[ Component::Client::MPD::Message ];
 use Readonly;
 use Test::More;
 
 
 our $nbtests = 2;
 our @tests   = (
-    # [ 'event', [ $arg1, $arg2, ... ], \&sub_checking_results ]
-    [ 'coll.all_files', [], \&check_all_files ],
+    # [ 'event', [ $arg1, $arg2, ... ], $answer_back, \&check_results ]
+    [ 'coll.all_files', [], $SEND, \&check_all_files ],
 );
 
 

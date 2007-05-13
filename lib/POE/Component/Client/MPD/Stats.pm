@@ -15,67 +15,109 @@
 #
 #
 
-package POE::Component::Client::MPD::Collection;
+package POE::Component::Client::MPD::Stats;
 
-use strict;
 use warnings;
+use strict;
 
-use POE  qw[ Component::Client::MPD::Message ];
 use base qw[ Class::Accessor::Fast ];
+__PACKAGE__->mk_accessors
+    ( qw[ artists albums songs uptime playtime db_playtime db_update ] );
 
-
-# -- Collection: retrieving songs & directories
-# -- Collection: retrieving the whole collection
-
-#
-# event: pl.all_files()
-#
-# Return a mpd_result event with the list of all filenames (strings)
-# currently known by mpd.
-#
-sub _onpub_all_files {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'list filename' ],
-        _cooking  => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
-}
-
-# -- Collection: picking songs
-# -- Collection: songs, albums & artists relations
+#our ($VERSION) = '$Rev$' =~ /(\d+)/;
 
 1;
 
 __END__
 
+=pod
+
 =head1 NAME
 
-POE::Component::Client::MPD::Collection - module handling collection commands
+POE::Component::Client::MPD::Stats - class representing MPD stats
+
+
+=head1 SYNOPSIS
+
+    print $stats->artists;
 
 
 =head1 DESCRIPTION
 
-C<POCOCM::Collection> is responsible for handling collection-related
-commands. To achieve those commands, send the corresponding event to
-the POCOCM session you created: it will be responsible for dispatching
-the event where it is needed.
+The MPD server maintains some general information. Those information can be
+queried with the C<stats> event of C<POCOCM>. This method fires back an
+event with a C<POCOCM::Message>, which C<data()> is an C<POCOCM::Stats> object,
+containing all relevant information.
+
+Note that an C<POCOCM::Stats> object does B<not> update itself regularly,
+and thus should be used immediately.
 
 
-=head1 PUBLIC EVENTS
+=head1 METHODS
 
-The following is a list of general purpose events accepted by POCOCM.
+=head2 Constructor
+
+=over 4
+
+=item new( %kv )
+
+The C<new()> method is the constructor for the C<POCOCM::Status> class.
+It is called internally by C<PCOCOM::Commands>, with the result of the
+C<stats> command sent to MPD server.
+
+Note: one should B<never> ever instantiate an C<POCOCM::Stats> object
+directly - use the C<stats> event of C<POCOCM>.
+
+=back
 
 
-=head2 Retrieving songs & directories
+=head2 Accessors
 
-=head2 Retrieving the whole collection
+Once created, one can access to the following members of the object:
 
-=head2 Picking songs
+=over 4
 
-=head2 Songs, albums & artists relations
+=item $stats->artists()
+
+Number of artists in the music database.
+
+
+=item $stats->albums()
+
+Number of albums in the music database.
+
+
+=item $stats->songs()
+
+Number of songs in the music database.
+
+
+=item $stats->uptime()
+
+Daemon uptime (time since last startup) in seconds.
+
+
+=item $stats->playtime()
+
+Time length of music played.
+
+
+=item $stats->db_playtime()
+
+Sum of all song times in the music database.
+
+
+=item $stats->db_update()
+
+Last database update in UNIX time.
+
+
+=back
+
+
+Please note that those accessors are read-only: changing a value will B<not>
+change the current settings of MPD server. Use C<POCOCM> events to alter
+the settings.
 
 
 =head1 SEE ALSO
