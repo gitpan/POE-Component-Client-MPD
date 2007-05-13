@@ -30,7 +30,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.2.0';
+our $VERSION = '0.3.0';
 
 
 #
@@ -72,20 +72,21 @@ sub spawn {
         },
         object_states => [
             $commands   => { # general purpose commands
-                'volume'         => '_onpub_volume',
-                'output_enable'  => '_onpub_output_enable',
-                'output_disable' => '_onpub_output_disable',
+                'volume'           => '_onpub_volume',
+                'output_enable'    => '_onpub_output_enable',
+                'output_disable'   => '_onpub_output_disable',
 
-                'stats'          => '_onpub_stats',
+                'stats'            => '_onpub_stats',
+                '_stats_postback'  => '_onpriv_stats_postback',
 
-                'next'           => '_onpub_next',
+                'next'             => '_onpub_next',
             },
             $collection => { # collection related commands
-                'coll.all_files'  => '_onpub_all_files',
+                'coll.all_files'    => '_onpub_all_files',
             },
             $playlist   => { # playlist related commands
-                'pl.add'          => '_onpub_add',
-                'pl.delete'       => '_onpub_delete',
+                'pl.add'            => '_onpub_add',
+                'pl.delete'         => '_onpub_delete',
             },
         ],
     );
@@ -120,6 +121,15 @@ sub _onpub_disconnect {
 sub _onprot_mpd_data {
     my $msg = $_[ARG0];
     return if $msg->_answer == $DISCARD;
+
+    # check for post-callback.
+    if ( defined $msg->_post ) {
+        $_[KERNEL]->yield( $msg->_post, $msg ); # need a post-treatment...
+        $msg->_post( undef );                   # remove postback.
+        return;
+    }
+
+    # send result.
     $_[KERNEL]->post( $msg->_from, 'mpd_result', $msg );
 }
 
