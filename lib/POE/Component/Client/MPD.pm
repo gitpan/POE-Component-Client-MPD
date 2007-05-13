@@ -20,6 +20,7 @@ package POE::Component::Client::MPD;
 use strict;
 use warnings;
 
+use List::MoreUtils qw[ firstidx ];
 use POE;
 use POE::Component::Client::MPD::Collection;
 use POE::Component::Client::MPD::Commands;
@@ -30,7 +31,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.3.1';
+our $VERSION = '0.4.0';
 
 
 #
@@ -61,44 +62,54 @@ sub spawn {
         args          => [ $args ],
         inline_states => {
             # private events
-            '_start'             => \&_onpriv_start,
-            '_send'              => \&_onpriv_send,
-            '_post_array2scalar' => \&_onpriv_post_array2scalar,
+            '_start'                   => \&_onpriv_start,
+            '_send'                    => \&_onpriv_send,
+            '_post_array2scalar'       => \&_onpriv_post_array2scalar,
             # protected events
-            '_mpd_data'    => \&_onprot_mpd_data,
-            '_mpd_error'   => \&_onprot_mpd_error,
-            '_mpd_version' => \&_onprot_mpd_version,
+            '_mpd_data'                => \&_onprot_mpd_data,
+            '_mpd_error'               => \&_onprot_mpd_error,
+            '_mpd_version'             => \&_onprot_mpd_version,
             # public events
-            'disconnect'   => \&_onpub_disconnect,
+            'disconnect'               => \&_onpub_disconnect,
         },
         object_states => [
             $commands   => { # general purpose commands
                 # -- MPD interaction: general commands
+                'updatedb'             => '_onpub_updatedb',
                 # -- MPD interaction: handling volume & output
-                'volume'           => '_onpub_volume',
-                'output_enable'    => '_onpub_output_enable',
-                'output_disable'   => '_onpub_output_disable',
+                'volume'               => '_onpub_volume',
+                'output_enable'        => '_onpub_output_enable',
+                'output_disable'       => '_onpub_output_disable',
                 # -- MPD interaction: retrieving info from current state
-                'stats'            => '_onpub_stats',
-                '_stats_postback'  => '_onpriv_stats_postback',
-                'status'           => '_onpub_status',
-                '_status_postback' => '_onpriv_status_postback',
-                'current'          => '_onpub_current',
+                'stats'                => '_onpub_stats',
+                '_stats_postback'      => '_onpriv_stats_postback',
+                'status'               => '_onpub_status',
+                '_status_postback'     => '_onpriv_status_postback',
+                'current'              => '_onpub_current',
                 # -- MPD interaction: altering settings
                 # -- MPD interaction: controlling playback
-                'play'             => '_onpub_play',
-                'playid'           => '_onpub_playid',
-                'pause'            => '_onpub_pause',
-                'stop'             => '_onpub_stop',
-                'next'             => '_onpub_next',
-                'prev'             => '_onpub_prev',
+                'play'                 => '_onpub_play',
+                'playid'               => '_onpub_playid',
+                'pause'                => '_onpub_pause',
+                'stop'                 => '_onpub_stop',
+                'next'                 => '_onpub_next',
+                'prev'                 => '_onpub_prev',
+                'seek'                 => '_onpub_seek',
+                '_seek_need_current'   => '_onpriv_seek_need_current',
+                'seekid'               => '_onpub_seekid',
+                '_seekid_need_current' => '_onpriv_seek_need_current',
             },
             $collection => { # collection related commands
-                'coll.all_files'    => '_onpub_all_files',
+                'coll.all_files'       => '_onpub_all_files',
             },
             $playlist   => { # playlist related commands
-                'pl.add'            => '_onpub_add',
-                'pl.delete'         => '_onpub_delete',
+                # -- Playlist: retrieving information
+                # -- Playlist: adding / removing songs
+                'pl.add'               => '_onpub_add',
+                'pl.delete'            => '_onpub_delete',
+                'pl.clear'             => '_onpub_clear',
+                # -- Playlist: changing playlist order
+                # -- Playlist: managing playlists
             },
         ],
     );
@@ -131,22 +142,34 @@ sub _onpub_disconnect {
 # Received when mpd finished to send back some data.
 #
 sub _onprot_mpd_data {
-    my $msg = $_[ARG0];
+    my ($k, $h, $msg) = @_[KERNEL, HEAP, ARG0];
     return if $msg->_answer == $DISCARD;
 
     # check for post-callback.
+    # need to be before pre-callback, since a pre-event may need to have
+    # a post-callback.
     if ( defined $msg->_post ) {
-        $_[KERNEL]->yield( $msg->_post, $msg ); # need a post-treatment...
-        $msg->_post( undef );                   # remove postback.
+        $k->yield( $msg->_post, $msg ); # need a post-treatment...
+        $msg->_post( undef );           # remove postback.
+        return;
+    }
+
+    # check for pre-callback.
+    my $preidx = firstidx { $msg->_request eq $_->_pre_event } @{ $h->{pre_messages} };
+    if ( $preidx != -1 ) {
+        my $pre = splice @{ $h->{pre_messages} }, $preidx, 1;
+        $k->yield( $pre->_pre_from, $pre, $msg );  # call post pre-event
+        $pre->_pre_from ( undef );                 # remove pre-callback
+        $pre->_pre_event( undef );                 # remove pre-event
         return;
     }
 
     # send result.
-    $_[KERNEL]->post( $msg->_from, 'mpd_result', $msg );
+    $k->post( $msg->_from, 'mpd_result', $msg );
 }
 
 sub _onprot_mpd_error {
-    warn "mpd error\n";
+    warn "mpd error:" . $_[ARG0]->error . "\n";
 }
 
 
@@ -189,6 +212,7 @@ sub _onpriv_start {
 
     $h->{password} = delete $params{password};
     $h->{_socket}  = POE::Component::Client::MPD::Connection->spawn(\%params);
+    $h->{pre_messages} = [];
 }
 
 
@@ -219,7 +243,13 @@ sub _connected {
 # $msg is a pococm-message partially filled.
 #
 sub _onpriv_send {
-    $_[KERNEL]->post( $_[HEAP]->{_socket}, 'send', $_[ARG0] );
+    my ($k, $h, $msg) = @_[KERNEL, HEAP, ARG0];
+    if ( defined $msg->_pre_event ) {
+        $k->yield( $msg->_pre_event );        # fire wanted pre-event
+        push @{ $h->{pre_messages} }, $msg;   # store message
+        return;
+    }
+    $k->post( $_[HEAP]->{_socket}, 'send', $msg );
 }
 
 
