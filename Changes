@@ -3,7 +3,7 @@ Revision history for POE-Component-Client-MPD
 High-level changelog
 ====================
 
-0.4.x  pre-events
+0.4.x  pre-events, data transform, more pococm-commands implemented
 0.3.x  post-events, helper classes, more pococm-commands implemented
 0.2.x  pococm-commands
 0.1.x  pococm-conn cleaning + features, pococm-message
@@ -12,6 +12,12 @@ High-level changelog
 
 Low-level changelog
 ===================
+
+0.4.1 Sun May 20 12:21:08 CEST 2007
+ - possibility to add transform to whole data instead of having to use post-callbacks
+ - new events handled:
+    . kill, version
+ - improved non-regression test suite
 
 0.4.0 Sun May 13 18:19:07 CEST 2007
  - possibility to use pre-events
@@ -30,15 +36,15 @@ Low-level changelog
 0.3.0 Sun May 13 14:03:50 CEST 2007
  - pococm now supports post callbacks, for post-treatments
  - new helper classes: pococm-time, pococm-status, pococm-stats
- - new event handled: stats()
+ - new event handled: stats
 
 **
 
 0.2.0 Sun May 13 12:30:58 CEST 2007
  - new module handling general commands: pococm-commands
  - new events handled:
-    . output_enable()
-    . output_disable()
+    . output_enable
+    . output_disable
  - serious pod cleaning
  - improved test framework
 

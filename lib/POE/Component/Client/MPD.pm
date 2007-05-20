@@ -31,7 +31,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.4.0';
+our $VERSION = '0.4.1';
 
 
 #
@@ -64,7 +64,6 @@ sub spawn {
             # private events
             '_start'                   => \&_onpriv_start,
             '_send'                    => \&_onpriv_send,
-            '_post_array2scalar'       => \&_onpriv_post_array2scalar,
             # protected events
             '_mpd_data'                => \&_onprot_mpd_data,
             '_mpd_error'               => \&_onprot_mpd_error,
@@ -75,6 +74,9 @@ sub spawn {
         object_states => [
             $commands   => { # general purpose commands
                 # -- MPD interaction: general commands
+                'version'              => '_onpub_version',
+                'kill'                 => '_onpub_kill',
+                #'password'             => '_onpub_password',
                 'updatedb'             => '_onpub_updatedb',
                 # -- MPD interaction: handling volume & output
                 'volume'               => '_onpub_volume',
@@ -82,9 +84,7 @@ sub spawn {
                 'output_disable'       => '_onpub_output_disable',
                 # -- MPD interaction: retrieving info from current state
                 'stats'                => '_onpub_stats',
-                '_stats_postback'      => '_onpriv_stats_postback',
                 'status'               => '_onpub_status',
-                '_status_postback'     => '_onpriv_status_postback',
                 'current'              => '_onpub_current',
                 # -- MPD interaction: altering settings
                 # -- MPD interaction: controlling playback
@@ -124,7 +124,7 @@ sub spawn {
 #
 # event: disconnect()
 #
-# Request the pococm to be shutdown. No argument.
+# Request the pococm to be shutdown. Leave mpd running.
 #
 sub _onpub_disconnect {
     my ($k,$h) = @_[KERNEL, HEAP];
@@ -143,7 +143,32 @@ sub _onpub_disconnect {
 #
 sub _onprot_mpd_data {
     my ($k, $h, $msg) = @_[KERNEL, HEAP, ARG0];
-    return if $msg->_answer == $DISCARD;
+
+    TRANSFORM:
+    {
+        # transform data if needed.
+        my $transform = $msg->_transform;
+        last TRANSFORM unless defined $msg->_transform;
+
+        $transform == $AS_SCALAR and do {
+            my $data = $msg->data->[0];
+            $msg->data($data);
+            last TRANSFORM;
+        };
+        $transform == $AS_STATS and do {
+            my %stats = @{ $msg->data };
+            my $stats = POE::Component::Client::MPD::Stats->new( \%stats );
+            $msg->data($stats);
+            last TRANSFORM;
+        };
+        $transform == $AS_STATUS and do {
+            my %status = @{ $msg->data };
+            my $status = POE::Component::Client::MPD::Status->new( \%status );
+            $msg->data($status);
+            last TRANSFORM;
+        };
+    }
+
 
     # check for post-callback.
     # need to be before pre-callback, since a pre-event may need to have
@@ -164,12 +189,16 @@ sub _onprot_mpd_data {
         return;
     }
 
+    return if $msg->_answer == $DISCARD;
+
     # send result.
     $k->post( $msg->_from, 'mpd_result', $msg );
 }
 
 sub _onprot_mpd_error {
-    warn "mpd error:" . $_[ARG0]->error . "\n";
+    # send error.
+    my $msg = $_[ARG0];
+    $_[KERNEL]->post( $msg->_from, 'mpd_error', $msg );
 }
 
 
@@ -252,19 +281,6 @@ sub _onpriv_send {
     $k->post( $_[HEAP]->{_socket}, 'send', $msg );
 }
 
-
-#
-# event: _post_array2scalar( $msg )
-#
-# Transform $msg->data from array ref to a single scalar. Useful only
-# as a postback callback, and if there's only one value in data().
-#
-sub _onpriv_post_array2scalar {
-    my $msg  = $_[ARG0];
-    my $data = $msg->data->[0];
-    $msg->data($data);
-    $_[KERNEL]->yield( '_mpd_data', $msg );
-}
 
 
 1;

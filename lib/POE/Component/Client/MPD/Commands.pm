@@ -26,7 +26,42 @@ use POE::Component::Client::MPD::Stats;
 use POE::Component::Client::MPD::Status;
 use base qw[ Class::Accessor::Fast ];
 
+
 # -- MPD interaction: general commands
+
+#
+# event: version()
+#
+# Fires back an event with the version number.
+#
+sub _onpub_version {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        data      => $_[HEAP]->{version}
+    } );
+    $_[KERNEL]->yield( '_mpd_data', $msg );
+}
+
+
+#
+# event: kill()
+#
+# Kill the mpd server, and request the pococm to be shutdown.
+#
+sub _onpub_kill {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ 'kill' ],
+        _cooking  => $RAW,
+        _post     => 'disconnect',  # shut down pococm behind us.
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
 
 #
 # event: updatedb( [$path] )
@@ -115,29 +150,14 @@ sub _onpub_output_disable {
 #
 sub _onpub_stats {
     my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'stats' ],
-        _cooking  => $AS_KV,
-        _post     => '_stats_postback',
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ 'stats' ],
+        _cooking   => $AS_KV,
+        _transform => $AS_STATS,
     } );
     $_[KERNEL]->yield( '_send', $msg );
-}
-
-
-#
-# event: _stats_postback( $msg )
-#
-# Transform $msg->data from hash to a POCOCM::Stats object with the current
-# statistics of MPD.
-#
-sub _onpriv_stats_postback {
-    my $msg   = $_[ARG0];
-    my %stats = @{ $msg->data };
-    my $stats = POE::Component::Client::MPD::Stats->new( \%stats );
-    $msg->data($stats);
-    $_[KERNEL]->yield( '_mpd_data', $msg );
 }
 
 
@@ -148,29 +168,14 @@ sub _onpriv_stats_postback {
 #
 sub _onpub_status {
     my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'status' ],
-        _cooking  => $AS_KV,
-        _post     => '_status_postback',
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ 'status' ],
+        _cooking   => $AS_KV,
+        _transform => $AS_STATUS,
     } );
     $_[KERNEL]->yield( '_send', $msg );
-}
-
-
-#
-# event: _status_postback( $msg )
-#
-# Transform $msg->data from hash to a POCOCM::Status object with the current
-# status of MPD.
-#
-sub _onpriv_status_postback {
-    my $msg   = $_[ARG0];
-    my %stats = @{ $msg->data };
-    my $stats = POE::Component::Client::MPD::Status->new( \%stats );
-    $msg->data($stats);
-    $_[KERNEL]->yield( '_mpd_data', $msg );
 }
 
 
@@ -181,12 +186,12 @@ sub _onpriv_status_postback {
 #
 sub _onpub_current {
     my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'currentsong' ],
-        _cooking  => $AS_ITEMS,
-        _post     => '_post_array2scalar',
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ 'currentsong' ],
+        _cooking   => $AS_ITEMS,
+        _transform => $AS_SCALAR,
     } );
     $_[KERNEL]->yield( '_send', $msg );
 }
