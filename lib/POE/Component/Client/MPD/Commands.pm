@@ -83,6 +83,23 @@ sub _onpub_updatedb {
 }
 
 
+#
+# event: urlhandlers()
+#
+# Return an array of supported URL schemes.
+#
+sub _onpub_urlhandlers {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ 'urlhandlers' ],
+        _cooking  => $STRIP_FIRST,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 # -- MPD interaction: handling volume & output
 
 #
@@ -93,14 +110,39 @@ sub _onpub_updatedb {
 # by that value.
 #
 sub _onpub_volume {
-    my $volume = $_[ARG0]; # FIXME: +/- prefix
+    # create stub message.
     my $msg = POE::Component::Client::MPD::Message->new( {
         _from     => $_[SENDER]->ID,
         _request  => $_[STATE],
         _answer   => $DISCARD,
-        _commands => [ "setvol $volume" ],
         _cooking  => $RAW,
     } );
+
+    my $volume = $_[ARG0];
+    if ( $volume =~ /^(-|\+)(\d+)/ )  {
+        $msg->_pre_from( '_volume_status' );
+        $msg->_pre_event( 'status' );
+        $msg->_pre_data( $volume );
+    } else {
+        $msg->_commands( [ "setvol $volume" ] );
+    }
+
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: _volume_status( $msg, $status )
+#
+# Use $status to get current volume, before sending real volume $msg.
+#
+sub _onpriv_volume_status {
+    my ($msg, $status) = @_[ARG0, ARG1];
+    my $curvol = $status->data->volume;
+    my $volume = $msg->_pre_data;
+    $volume =~ /^(-|\+)(\d+)/;
+    $volume = $1 eq '+' ? $curvol + $2 : $curvol - $2;
+    $msg->_commands( [ "setvol $volume" ] );
     $_[KERNEL]->yield( '_send', $msg );
 }
 
@@ -197,7 +239,154 @@ sub _onpub_current {
 }
 
 
+#
+# event: song( [$song] )
+#
+# Return a POCOCM::Item::Song representing the song number $song.
+# If $song is not supplied, returns the current song.
+#
+sub _onpub_song {
+    my ($k,$song) = @_[KERNEL, ARG0];
+
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ defined $song ? "playlistinfo $song" : 'currentsong' ],
+        _cooking   => $AS_ITEMS,
+        _transform => $AS_SCALAR,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: songid( [$songid] )
+#
+# Return a POCOCM::Item::Song representing the song id $songid.
+# If $songid is not supplied, returns the current song.
+#
+sub _onpub_songid {
+    my ($k,$song) = @_[KERNEL, ARG0];
+
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ defined $song ? "playlistid $song" : 'currentsong' ],
+        _cooking   => $AS_ITEMS,
+        _transform => $AS_SCALAR,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 # -- MPD interaction: altering settings
+
+#
+# event: repeat( [$repeat] )
+#
+# Set the repeat mode to $repeat (1 or 0). If $repeat is not specified then
+# the repeat mode is toggled.
+#
+sub _onpub_repeat {
+    # create stub message.
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _cooking  => $RAW,
+    } );
+
+    my $mode = $_[ARG0];
+    if ( not defined $mode )  {
+        $msg->_pre_from( '_repeat_status' );
+        $msg->_pre_event( 'status' );
+    } else {
+        $mode = $mode ? 1 : 0;   # force integer
+        $msg->_commands( [ "repeat $mode" ] );
+    }
+
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: _repeat_status( $msg, $status )
+#
+# Use $status to get current repeat mode, before sending real repeat $msg.
+#
+sub _onpriv_repeat_status {
+    my ($msg, $status) = @_[ARG0, ARG1];
+    my $mode = not $status->data->repeat;
+    $mode = $mode ? 1 : 0;   # force integer
+    $msg->_commands( [ "repeat $mode" ] );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: fade( [$seconds] )
+#
+# Enable crossfading and set the duration of crossfade between songs. If
+# $seconds is not specified or $seconds is 0, then crossfading is disabled.
+#
+sub _onpub_fade {
+    my $seconds = $_[ARG0];
+    $seconds ||= 0;
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "crossfade $seconds" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: random( [$random] )
+#
+# Set the random mode to $random (1 or 0). If $random is not specified then
+# the random mode is toggled.
+#
+sub _onpub_random {
+    # create stub message.
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _cooking  => $RAW,
+    } );
+
+    my $mode = $_[ARG0];
+    if ( not defined $mode )  {
+        $msg->_pre_from( '_random_status' );
+        $msg->_pre_event( 'status' );
+    } else {
+        $mode = $mode ? 1 : 0;   # force integer
+        $msg->_commands( [ "random $mode" ] );
+    }
+
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: _repeat_status( $msg, $status )
+#
+# Use $status to get current repeat mode, before sending real repeat $msg.
+#
+sub _onpriv_random_status {
+    my ($msg, $status) = @_[ARG0, ARG1];
+    my $mode = not $status->data->random;
+    $mode = $mode ? 1 : 0;   # force integer
+    $msg->_commands( [ "random $mode" ] );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 # -- MPD interaction: controlling playback
 
 #

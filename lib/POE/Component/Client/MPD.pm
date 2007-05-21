@@ -31,7 +31,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.4.1';
+our $VERSION = '0.4.2';
 
 
 #
@@ -76,17 +76,26 @@ sub spawn {
                 # -- MPD interaction: general commands
                 'version'              => '_onpub_version',
                 'kill'                 => '_onpub_kill',
-                #'password'             => '_onpub_password',
+# #                 'password'             => '_onpub_password',
                 'updatedb'             => '_onpub_updatedb',
+                'urlhandlers'          => '_onpub_urlhandlers',
                 # -- MPD interaction: handling volume & output
                 'volume'               => '_onpub_volume',
+                '_volume_status'       => '_onpriv_volume_status',
                 'output_enable'        => '_onpub_output_enable',
                 'output_disable'       => '_onpub_output_disable',
                 # -- MPD interaction: retrieving info from current state
                 'stats'                => '_onpub_stats',
                 'status'               => '_onpub_status',
                 'current'              => '_onpub_current',
+                'song'                 => '_onpub_song',
+                'songid'               => '_onpub_songid',
                 # -- MPD interaction: altering settings
+                'repeat'               => '_onpub_repeat',
+                '_repeat_status'       => '_onpriv_repeat_status',
+                'random'               => '_onpub_random',
+                '_random_status'       => '_onpriv_random_status',
+                'fade'                 => '_onpub_fade',
                 # -- MPD interaction: controlling playback
                 'play'                 => '_onpub_play',
                 'playid'               => '_onpub_playid',
@@ -100,16 +109,48 @@ sub spawn {
                 '_seekid_need_current' => '_onpriv_seek_need_current',
             },
             $collection => { # collection related commands
+                # -- Collection: retrieving songs & directories
+# #                 all_items
+# #                 all_items_simple
+# #                 items_in_dir
+                # -- Collection: retrieving the whole collection
+# #                 all_songs
+# #                 all_albums
+# #                 all_artists
+# #                 all_titles
                 'coll.all_files'       => '_onpub_all_files',
+                # -- Collection: picking songs
+# #                 song
+# #                 songs_with_filename_partial
+                # -- Collection: songs, albums & artists relations
+# #                 albums_by_artist
+# #                 songs_by_artist
+# #                 songs_by_artist_partial
+# #                 songs_from_album
+# #                 songs_from_album_partial
+# #                 songs_with_title
+# #                 songs_with_title_partial
             },
             $playlist   => { # playlist related commands
                 # -- Playlist: retrieving information
+# #                 as_items
+# #                 items_changed_since
                 # -- Playlist: adding / removing songs
                 'pl.add'               => '_onpub_add',
                 'pl.delete'            => '_onpub_delete',
+# #                 deleteid
                 'pl.clear'             => '_onpub_clear',
+# #                 crop
                 # -- Playlist: changing playlist order
+# #                 shuffle
+# #                 swap
+# #                 swapid
+# #                 move
+# #                 moveid
                 # -- Playlist: managing playlists
+# #                 load
+# #                 save
+# #                 rm
             },
         ],
     );

@@ -27,27 +27,38 @@ use Readonly;
 use Test::More;
 
 
-our $nbtests = 10;
+our $nbtests = 16;
 my @songs = qw[ title.ogg dir1/title-artist-album.ogg dir1/title-artist.ogg ];
 our @tests   = (
     # [ 'event', [ $arg1, $arg2, ... ], $answer_back, \&check_results ]
 
-    [ 'updatedb', [],      $DISCARD, undef          ],
-    [ 'pl.add',   \@songs, $DISCARD, undef          ],
-    [ 'stats',    [],      $SEND,    \&check_stats  ],
+    # stats
+    [ 'updatedb', [],      $DISCARD, undef                ],
+    [ 'pl.add',   \@songs, $DISCARD, undef                ],
+    [ 'stats',    [],      $SEND,    \&check_stats        ],
 
-    [ 'play',     [],      $DISCARD, undef          ],
-    [ 'pause',    [],      $DISCARD, undef          ],
-    [ 'status',   [],      $SEND,    \&check_status ],
+    # status
+    [ 'play',     [],      $DISCARD, undef                ],
+    [ 'pause',    [],      $DISCARD, undef                ],
+    [ 'status',   [],      $SEND,    \&check_status       ],
 
-    [ 'current',  [],      $SEND,    \&check_current ],
+    # current
+    [ 'current',  [],      $SEND,    \&check_current      ],
 
+    # song
+    [ 'song',     [1],     $SEND,    \&check_song         ],
+    [ 'song',     [],      $SEND,    \&check_song_current ],
+
+    # songid (use the same checkers as song)
+    [ 'songid',   [1],     $SEND,    \&check_song         ],
+    [ 'songid',   [],      $SEND,    \&check_song_current ],
 );
 
 
 # are we able to test module?
 eval 'use POE::Component::Client::MPD::Test';
 plan skip_all => $@ if $@ =~ s/\n+BEGIN failed--compilation aborted.*//s;
+exit;
 
 
 sub check_stats {
@@ -74,6 +85,19 @@ sub check_current {
     isa_ok( $song, 'POE::Component::Client::MPD::Item::Song',
             'current return a POCOCM::Item::Song object' );
 }
+
+sub check_song {
+    my $song = $_[0]->data;
+    isa_ok( $song, 'POE::Component::Client::MPD::Item::Song',
+            'song(id) returns a POCOCM::Item::Song object' );
+    is( $song->file, 'dir1/title-artist-album.ogg', 'song(id) returns the wanted song' );
+}
+
+sub check_song_current {
+    my $song = $_[0]->data;
+    is( $song->file, 'title.ogg', 'song(id) defaults to current song' );
+}
+
 
 __END__
 
