@@ -115,6 +115,30 @@ sub _onpub_delete {
 
 
 #
+# event: pl.deleteid( $songid, $songid, ... )
+#
+# Remove the specified $songid (as assigned by mpd when inserted in playlist)
+# from the current playlist.
+#
+sub _onpub_deleteid {
+    my @songids  = @_[ARG0 .. $#_];    # args of the poe event
+    my @commands = (                   # build the commands
+        'command_list_begin',
+        map( qq[deleteid $_], @songids ),
+        'command_list_end',
+    );
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => \@commands,
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
 # event: clear()
 #
 # Remove all the songs from the current playlist.
@@ -129,6 +153,46 @@ sub _onpub_clear {
     } );
     $_[KERNEL]->yield( '_send', $msg );
 }
+
+
+#
+# event: crop()
+#
+#  Remove all of the songs from the current playlist *except* the current one.
+#
+sub _onpub_crop {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $DISCARD,
+        _cooking   => $RAW,
+        _pre_from  => '_crop_status',
+        _pre_event => 'status',
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: _crop_status( $msg, $status)
+#
+# Use $status to get current song, before sending real crop $msg.
+#
+sub _onpriv_crop_status {
+    my ($msg, $status) = @_[ARG0, ARG1];
+    my $cur = $status->data->song;
+    my $len = $status->data->playlistlength - 1;
+
+    my @commands = (
+        'command_list_begin',
+        map( { $_  != $cur ? "delete $_" : '' } reverse 0..$len ),
+        'command_list_end'
+    );
+    $msg->_commands( \@commands );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 
 
 

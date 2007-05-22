@@ -31,7 +31,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.5.0';
+our $VERSION = '0.5.1';
 
 
 #
@@ -138,9 +138,10 @@ sub spawn {
                 # -- Playlist: adding / removing songs
                 'pl.add'               => '_onpub_add',
                 'pl.delete'            => '_onpub_delete',
-# #                 deleteid
+                'pl.deleteid'          => '_onpub_deleteid',
                 'pl.clear'             => '_onpub_clear',
-# #                 crop
+                'pl.crop'              => '_onpub_crop',
+                '_crop_status'         => '_onpriv_crop_status',
                 # -- Playlist: changing playlist order
 # #                 shuffle
 # #                 swap
