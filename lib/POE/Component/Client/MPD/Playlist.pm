@@ -1,17 +1,9 @@
 #
+# This file is part of POE::Component::Client::MPD.
+# Copyright (c) 2007 Jerome Quelin, all rights reserved.
+#
 # This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# it under the same terms as Perl itself.
 #
 #
 
@@ -193,10 +185,97 @@ sub _onpriv_crop_status {
 }
 
 
-
-
-
 # -- Playlist: changing playlist order
+
+#
+# event: pl.shuffle()
+#
+# Shuffle the current playlist.
+#
+sub _onpub_shuffle {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ 'shuffle' ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: pl.swap( $song1, song2 )
+#
+# Swap positions of song number $song1 and $song2 in the current playlist.
+#
+sub _onpub_swap {
+    my ($from, $to) = @_[ARG0, ARG1];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "swap $from $to" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: pl.swapid( $songid1, songid2 )
+#
+# Swap positions of song id $songid1 and $songid2 in the current playlist.
+#
+sub _onpub_swapid {
+    my ($from, $to) = @_[ARG0, ARG1];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "swapid $from $to" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: pl.move( $song, $newpos );
+#
+# Move song number $song to the position $newpos.
+#
+sub _onpub_move {
+    my ($song, $pos) = @_[ARG0, ARG1];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "move $song $pos" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: pl.moveid( $songid, $newpos );
+#
+# Move song id $songid to the position $newpos.
+#
+sub _onpub_moveid {
+    my ($songid, $pos) = @_[ARG0, ARG1];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $DISCARD,
+        _commands => [ "moveid $songid $pos" ],
+        _cooking  => $RAW,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 # -- Playlist: managing playlists
 
 1;
@@ -244,20 +323,9 @@ Jerome Quelin, C<< <jquelin at cpan.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2007 Jerome Quelin, all rights reserved.
+Copyright (c) 2007 Jerome Quelin, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+it under the same terms as Perl itself.
 
 =cut
