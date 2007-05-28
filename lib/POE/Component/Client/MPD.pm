@@ -23,7 +23,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.5.2';
+our $VERSION = '0.5.3';
 
 
 #
@@ -141,9 +141,9 @@ sub spawn {
                 'pl.move'              => '_onpub_move',
                 'pl.moveid'            => '_onpub_moveid',
                 # -- Playlist: managing playlists
-# #                 load
-# #                 save
-# #                 rm
+                'pl.load'              => '_onpub_load',
+                'pl.save'              => '_onpub_save',
+                'pl.rm'                => '_onpub_rm',
             },
         ],
     );
