@@ -17,10 +17,82 @@ use base qw[ Class::Accessor::Fast ];
 
 
 # -- Collection: retrieving songs & directories
+
+#
+# event: coll.all_items( [$path] )
+#
+# Return *all* POCOCM::Items (both songs & directories) currently known
+# by mpd.
+# If $path is supplied (relative to mpd root), restrict the retrieval to
+# songs and dirs in this directory.
+#
+sub _onpub_all_items {
+    my $path = $_[ARG0];
+    $path ||= '';
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ qq[listallinfo "$path"] ],
+        _cooking  => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.all_items_simple( [$path] )
+#
+# Return *all* POCOCM::Items (both songs & directories) currently known
+# by mpd.
+#
+# If $path is supplied (relative to mpd root), restrict the retrieval to
+# songs and dirs in this directory.
+#
+# /!\ Warning: the POCOCM::Item::Song objects will only have their tag
+# file filled. Any other tag will be empty, so don't use this sub for any
+# other thing than a quick scan!
+#
+sub _onpub_all_items_simple {
+    my $path = $_[ARG0];
+    $path ||= '';
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ qq[listall "$path"] ],
+        _cooking  => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.items_in_dir( [$path] )
+#
+# Return the items in the given $path. If no $path supplied, do it on mpd's
+# root directory.
+# Note that this sub does not work recusrively on all directories.
+#
+sub _onpub_items_in_dir {
+    my $path = $_[ARG0];
+    $path ||= '';
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ qq[lsinfo "$path"] ],
+        _cooking  => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+
 # -- Collection: retrieving the whole collection
 
 #
-# event: pl.all_files()
+# event: coll.all_files()
 #
 # Return a mpd_result event with the list of all filenames (strings)
 # currently known by mpd.
