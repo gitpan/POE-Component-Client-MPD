@@ -12,8 +12,8 @@ package POE::Component::Client::MPD::Connection;
 use strict;
 use warnings;
 
+use Audio::MPD::Common::Item;
 use POE;
-use POE::Component::Client::MPD::Item;
 use POE::Component::Client::MPD::Message;
 use POE::Component::Client::TCP;
 use Readonly;
@@ -232,18 +232,18 @@ sub _onpriv_ServerInput_data {
 
         $cooking == $AS_ITEMS and do {
             # Lots of POCOCM methods are sending commands and then parse the
-            # output to build a pococm-item.
+            # output to build an amc-item.
             my ($k,$v) = split /:\s+/, $input, 2;
             $k = lc $k;
 
             if ( $k eq 'file' || $k eq 'directory' || $k eq 'playlist' ) {
-                # build a new pococm-item
-                my $item = POE::Component::Client::MPD::Item->new( $k => $v );
+                # build a new amc-item
+                my $item = Audio::MPD::Common::Item->new( $k => $v );
                 push @{ $h->{incoming} }, $item;
                 last COOKING;
             }
 
-            # just complete the current pococm-item
+            # just complete the current amc-item
             $h->{incoming}[-1]->$k($v);
             last COOKING;
         };
