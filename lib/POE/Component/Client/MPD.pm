@@ -23,7 +23,7 @@ use base qw[ Class::Accessor::Fast ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
 
 
-our $VERSION = '0.6.2';
+our $VERSION = '0.6.3';
 
 
 #
@@ -115,13 +115,13 @@ sub spawn {
                 'coll.song'             => '_onpub_song',
                 'coll.songs_with_filename_partial' => '_onpub_songs_with_filename_partial',
                 # -- Collection: songs, albums & artists relations
-# #                 albums_by_artist
-# #                 songs_by_artist
-# #                 songs_by_artist_partial
-# #                 songs_from_album
-# #                 songs_from_album_partial
-# #                 songs_with_title
-# #                 songs_with_title_partial
+                'coll.albums_by_artist' => '_onpub_albums_by_artist',
+                'coll.songs_by_artist'  => '_onpub_songs_by_artist',
+                'coll.songs_by_artist_partial' => '_onpub_songs_by_artist_partial',
+                'coll.songs_from_album' => '_onpub_songs_from_album',
+                'coll.songs_from_album_partial' => '_onpub_songs_from_album_partial',
+                'coll.songs_with_title' => '_onpub_songs_with_title',
+                'coll.songs_with_title_partial' => '_onpub_songs_with_title_partial',
             },
             $playlist   => { # playlist related commands
                 # -- Playlist: retrieving information

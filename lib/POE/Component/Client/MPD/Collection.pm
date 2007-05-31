@@ -203,6 +203,133 @@ sub _onpub_songs_with_filename_partial {
 
 # -- Collection: songs, albums & artists relations
 
+#
+# event: coll.albums_by_artist($artist);
+#
+# Return all albums (strings) performed by $artist or where $artist
+# participated.
+#
+sub _onpub_albums_by_artist {
+    my $artist = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[list album "$artist"] ],
+        _cooking   => $STRIP_FIRST,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_by_artist($artist);
+#
+# Return all AMC::Item::Songs performed by $artist.
+#
+sub _onpub_songs_by_artist {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[find artist "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_by_artist_partial($artist);
+#
+# Return all AMC::Item::Songs performed by $artist.
+#
+sub _onpub_songs_by_artist_partial {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[search artist "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_from_album($album);
+#
+# Return all AMC::Item::Songs appearing in $album.
+#
+sub _onpub_songs_from_album {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[find album "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_from_album_partial($string);
+#
+# Return all AMC::Item::Songs appearing in album containing $string.
+#
+sub _onpub_songs_from_album_partial {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[search album "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_with_title($title);
+#
+# Return all AMC::Item::Songs which title is exactly $title.
+#
+sub _onpub_songs_with_title {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[find title "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_with_title_partial($string);
+#
+# Return all AMC::Item::Songs where $string is part of the title.
+#
+sub _onpub_songs_with_title_partial {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[search title "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 1;
 
 __END__
