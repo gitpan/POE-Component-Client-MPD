@@ -163,6 +163,44 @@ sub _onpub_all_files {
 }
 
 # -- Collection: picking songs
+
+#
+# event: coll.song( $path )
+#
+# Return the AMC::Item::Song which correspond to $path.
+#
+sub _onpub_song {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[find filename "$what"] ],
+        _cooking   => $AS_ITEMS,
+        _transform => $AS_SCALAR,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.songs_with_filename_partial( $string );
+#
+# Return the AMC::Item::Songs containing $string in their path.
+#
+sub _onpub_songs_with_filename_partial {
+    my $what = $_[ARG0];
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from      => $_[SENDER]->ID,
+        _request   => $_[STATE],
+        _answer    => $SEND,
+        _commands  => [ qq[search filename "$what"] ],
+        _cooking   => $AS_ITEMS,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 # -- Collection: songs, albums & artists relations
 
 1;
