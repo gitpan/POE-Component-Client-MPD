@@ -91,6 +91,60 @@ sub _onpub_items_in_dir {
 
 # -- Collection: retrieving the whole collection
 
+
+# event: coll.all_songs( )
+
+#
+# event: coll.all_albums( )
+#
+# Return the list of all albums (strings) currently known by mpd.
+#
+sub _onpub_all_albums {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ 'list album' ],
+        _cooking  => $STRIP_FIRST,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.all_artists( )
+#
+# Return the list of all artists (strings) currently known by mpd.
+#
+sub _onpub_all_artists {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ 'list artist' ],
+        _cooking  => $STRIP_FIRST,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
+#
+# event: coll.all_titles( )
+#
+# Return the list of all titles (strings) currently known by mpd.
+#
+sub _onpub_all_titles {
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from     => $_[SENDER]->ID,
+        _request  => $_[STATE],
+        _answer   => $SEND,
+        _commands => [ 'list title' ],
+        _cooking  => $STRIP_FIRST,
+    } );
+    $_[KERNEL]->yield( '_send', $msg );
+}
+
+
 #
 # event: coll.all_files()
 #
