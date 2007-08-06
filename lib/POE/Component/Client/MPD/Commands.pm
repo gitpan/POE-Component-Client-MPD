@@ -13,11 +13,52 @@ use strict;
 use warnings;
 
 use POE;
+use POE::Component::Client::MPD qw[ :all ];
 use POE::Component::Client::MPD::Message;
+use Readonly;
+
 use base qw[ Class::Accessor::Fast ];
+
+Readonly my @EVENTS => qw[
+    disconnect
+    version kill updatedb urlhandlers
+    volume output_enable output_disable
+    stats status current song songid
+    repeat random fade
+    play playid pause stop next prev seek seekid
+];
+
+sub _spawn {
+    my $object = __PACKAGE__->new;
+    my $session = POE::Session->create(
+        inline_states => {
+            '_start'      => sub { $_[KERNEL]->alias_set( $MPD ) },
+            '_default'    => \&POE::Component::Client::MPD::_onpub_default,
+            '_dispatch'   => \&_onpriv_dispatch,
+        },
+        object_states => [ $object => [ map { "_onpub_$_" } @EVENTS ] ]
+    );
+
+    return $session->ID;
+}
+
+sub _onpriv_dispatch {
+    my $msg = $_[ARG0];
+    my $event = $msg->_dispatch;
+    $event =~ s/^[^.]\.//;
+#     warn "dispatching $event\n";
+    $_[KERNEL]->yield( "_onpub_$event", $msg );
+}
 
 
 # -- MPD interaction: general commands
+
+sub _onpub_disconnect {
+    my $k = $_[KERNEL];
+    $k->alias_remove( $MPD );
+    $k->post( $_HUB, '_disconnect' );
+}
+
 
 #
 # event: version()
@@ -25,13 +66,10 @@ use base qw[ Class::Accessor::Fast ];
 # Fires back an event with the version number.
 #
 sub _onpub_version {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        data      => $_[HEAP]->{version}
-    } );
-    $_[KERNEL]->yield( '_mpd_data', $msg );
+    my ($k, $msg) = @_[KERNEL, ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_cooking  ( $RAW );
+    $k->post( $_HUB, '_version', $msg );
 }
 
 
@@ -41,15 +79,14 @@ sub _onpub_version {
 # Kill the mpd server, and request the pococm to be shutdown.
 #
 sub _onpub_kill {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ 'kill' ],
-        _cooking  => $RAW,
-        _post     => 'disconnect',  # shut down pococm behind us.
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my ($k, $msg) = @_[KERNEL, ARG0];
+
+    $msg->_post_to   ( $MPD );
+    $msg->_post_event( 'disconnect' );
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ 'kill' ] );
+    $msg->_cooking  ( $RAW );
+    $k->post( $_HUB, '_send', $msg );
 }
 
 
@@ -61,15 +98,13 @@ sub _onpub_kill {
 # its whole collection.
 #
 sub _onpub_updatedb {
-    my $path = defined $_[ARG0] ? $_[ARG0] : '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "update $path" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $path = defined $msg->_params->[0] ? $msg->_params->[0] : '';
+
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ qq[update "$path"] ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -79,14 +114,12 @@ sub _onpub_updatedb {
 # Return an array of supported URL schemes.
 #
 sub _onpub_urlhandlers {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'urlhandlers' ],
-        _cooking  => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'urlhandlers' ] );
+    $msg->_cooking  ( $STRIP_FIRST );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -100,40 +133,31 @@ sub _onpub_urlhandlers {
 # by that value.
 #
 sub _onpub_volume {
-    # create stub message.
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _cooking  => $RAW,
-    } );
+    my ($k, $msg) = @_[KERNEL, ARG0];
+    my $volume;
 
-    my $volume = $_[ARG0];
-    if ( $volume =~ /^(-|\+)(\d+)/ )  {
-        $msg->_pre_from( '_volume_status' );
-        $msg->_pre_event( 'status' );
-        $msg->_pre_data( $volume );
+    if ( $msg->_params->[0] =~ /^(-|\+)(\d+)/ ) {
+        my ($op, $delta) = ($1, $2);
+        if ( not defined $msg->data ) {
+            # no status yet - fire an event
+            $msg->_dispatch  ( 'status' );
+            $msg->_post_to   ( $MPD );
+            $msg->_post_event( 'volume' );
+            $k->yield( '_dispatch', $msg );
+            return;
+        }
+
+        # already got a status result
+        my $curvol = $msg->data->volume;
+        $volume = $op eq '+' ? $curvol + $delta : $curvol - $delta;
     } else {
-        $msg->_commands( [ "setvol $volume" ] );
+        $volume = $msg->_params->[0];
     }
 
-    $_[KERNEL]->yield( '_send', $msg );
-}
-
-
-#
-# event: _volume_status( $msg, $status )
-#
-# Use $status to get current volume, before sending real volume $msg.
-#
-sub _onpriv_volume_status {
-    my ($msg, $status) = @_[ARG0, ARG1];
-    my $curvol = $status->data->volume;
-    my $volume = $msg->_pre_data;
-    $volume =~ /^(-|\+)(\d+)/;
-    $volume = $1 eq '+' ? $curvol + $2 : $curvol - $2;
-    $msg->_commands( [ "setvol $volume" ] );
-    $_[KERNEL]->yield( '_send', $msg );
+    $msg->_cooking  ( $RAW );
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "setvol $volume" ] );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -143,15 +167,13 @@ sub _onpriv_volume_status {
 # Enable the specified audio output. $output is the ID of the audio output.
 #
 sub _onpub_output_enable {
-    my $output = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "enableoutput $output" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg    = $_[ARG0];
+    my $output = $msg->_params->[0];
+
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "enableoutput $output" ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -161,15 +183,13 @@ sub _onpub_output_enable {
 # Disable the specified audio output. $output is the ID of the audio output.
 #
 sub _onpub_output_disable {
-    my $output = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "disableoutput $output" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg    = $_[ARG0];
+    my $output = $msg->_params->[0];
+
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "disableoutput $output" ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -181,15 +201,12 @@ sub _onpub_output_disable {
 # Return a hash with the current statistics of MPD.
 #
 sub _onpub_stats {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ 'stats' ],
-        _cooking   => $AS_KV,
-        _transform => $AS_STATS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'stats' ] );
+    $msg->_cooking  ( $AS_KV );
+    $msg->_transform( $AS_STATS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -199,15 +216,12 @@ sub _onpub_stats {
 # Return a hash with the current status of MPD.
 #
 sub _onpub_status {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ 'status' ],
-        _cooking   => $AS_KV,
-        _transform => $AS_STATUS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'status' ] );
+    $msg->_cooking  ( $AS_KV );
+    $msg->_transform( $AS_STATUS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -217,15 +231,12 @@ sub _onpub_status {
 # Return a POCOCM::Item::Song representing the song currently playing.
 #
 sub _onpub_current {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ 'currentsong' ],
-        _cooking   => $AS_ITEMS,
-        _transform => $AS_SCALAR,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'currentsong' ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $msg->_transform( $AS_SCALAR );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -236,17 +247,13 @@ sub _onpub_current {
 # If $song is not supplied, returns the current song.
 #
 sub _onpub_song {
-    my ($k,$song) = @_[KERNEL, ARG0];
-
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ defined $song ? "playlistinfo $song" : 'currentsong' ],
-        _cooking   => $AS_ITEMS,
-        _transform => $AS_SCALAR,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $song = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ defined $song ? "playlistinfo $song" : 'currentsong' ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $msg->_transform( $AS_SCALAR );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -257,17 +264,13 @@ sub _onpub_song {
 # If $songid is not supplied, returns the current song.
 #
 sub _onpub_songid {
-    my ($k,$song) = @_[KERNEL, ARG0];
-
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ defined $song ? "playlistid $song" : 'currentsong' ],
-        _cooking   => $AS_ITEMS,
-        _transform => $AS_SCALAR,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $song = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ defined $song ? "playlistid $song" : 'currentsong' ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $msg->_transform( $AS_SCALAR );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -280,38 +283,28 @@ sub _onpub_songid {
 # the repeat mode is toggled.
 #
 sub _onpub_repeat {
-    # create stub message.
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _cooking  => $RAW,
-    } );
+    my ($k, $msg) = @_[KERNEL, ARG0];
 
-    my $mode = $_[ARG0];
-    if ( not defined $mode )  {
-        $msg->_pre_from( '_repeat_status' );
-        $msg->_pre_event( 'status' );
-    } else {
+    my $mode = $msg->_params->[0];
+    if ( defined $mode )  {
         $mode = $mode ? 1 : 0;   # force integer
-        $msg->_commands( [ "repeat $mode" ] );
+    } else {
+        if ( not defined $msg->data ) {
+            # no status yet - fire an event
+            $msg->_dispatch  ( 'status' );
+            $msg->_post_to   ( $MPD );
+            $msg->_post_event( 'repeat' );
+            $k->post( $MPD, '_dispatch', $msg );
+            return;
+        }
+
+        $mode = $msg->data->repeat ? 0 : 1; # negate current value
     }
 
-    $_[KERNEL]->yield( '_send', $msg );
-}
-
-
-#
-# event: _repeat_status( $msg, $status )
-#
-# Use $status to get current repeat mode, before sending real repeat $msg.
-#
-sub _onpriv_repeat_status {
-    my ($msg, $status) = @_[ARG0, ARG1];
-    my $mode = not $status->data->repeat;
-    $mode = $mode ? 1 : 0;   # force integer
+    $msg->_cooking ( $RAW );
+    $msg->_answer  ( $DISCARD );
     $msg->_commands( [ "repeat $mode" ] );
-    $_[KERNEL]->yield( '_send', $msg );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -322,16 +315,12 @@ sub _onpriv_repeat_status {
 # $seconds is not specified or $seconds is 0, then crossfading is disabled.
 #
 sub _onpub_fade {
-    my $seconds = $_[ARG0];
-    $seconds ||= 0;
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "crossfade $seconds" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg     = $_[ARG0];
+    my $seconds = $msg->_params->[0] || 0;
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "crossfade $seconds" ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -342,39 +331,30 @@ sub _onpub_fade {
 # the random mode is toggled.
 #
 sub _onpub_random {
-    # create stub message.
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _cooking  => $RAW,
-    } );
+    my ($k, $msg) = @_[KERNEL, ARG0];
 
-    my $mode = $_[ARG0];
-    if ( not defined $mode )  {
-        $msg->_pre_from( '_random_status' );
-        $msg->_pre_event( 'status' );
-    } else {
+    my $mode = $msg->_params->[0];
+    if ( defined $mode )  {
         $mode = $mode ? 1 : 0;   # force integer
-        $msg->_commands( [ "random $mode" ] );
+    } else {
+        if ( not defined $msg->data ) {
+            # no status yet - fire an event
+            $msg->_dispatch  ( 'status' );
+            $msg->_post_to   ( $MPD );
+            $msg->_post_event( 'random' );
+            $k->post( $MPD, '_dispatch', $msg );
+            return;
+        }
+
+        $mode = $msg->data->random ? 0 : 1; # negate current value
     }
 
-    $_[KERNEL]->yield( '_send', $msg );
-}
-
-
-#
-# event: _repeat_status( $msg, $status )
-#
-# Use $status to get current repeat mode, before sending real repeat $msg.
-#
-sub _onpriv_random_status {
-    my ($msg, $status) = @_[ARG0, ARG1];
-    my $mode = not $status->data->random;
-    $mode = $mode ? 1 : 0;   # force integer
+    $msg->_cooking ( $RAW );
+    $msg->_answer  ( $DISCARD );
     $msg->_commands( [ "random $mode" ] );
-    $_[KERNEL]->yield( '_send', $msg );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
+
 
 
 # -- MPD interaction: controlling playback
@@ -386,15 +366,12 @@ sub _onpriv_random_status {
 # resume playing.
 #
 sub _onpub_play {
-    my $number = defined $_[ARG0] ? $_[ARG0] : '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "play $number" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    my $number = defined $msg->_params->[0] ? $msg->_params->[0] : '';
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "play $number" ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -405,15 +382,12 @@ sub _onpub_play {
 # resume playing.
 #
 sub _onpub_playid {
-    my $number = defined $_[ARG0] ? $_[ARG0] : '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "playid $number" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    my $number = defined $msg->_params->[0] ? $msg->_params->[0] : '';
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "playid $number" ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -426,15 +400,12 @@ sub _onpub_playid {
 # Note that if $state is not given, pause state will be toggled.
 #
 sub _onpub_pause {
-    my $state = defined $_[ARG0] ? $_[ARG0] : '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ "pause $state" ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    my $state = defined $msg->_params->[0] ? $msg->_params->[0] : '';
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ "pause $state" ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -444,14 +415,11 @@ sub _onpub_pause {
 # Stop playback
 #
 sub _onpub_stop {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ 'stop' ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ 'stop' ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -461,14 +429,11 @@ sub _onpub_stop {
 # Play next song in playlist.
 #
 sub _onpub_next {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ 'next' ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ 'next' ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -478,14 +443,11 @@ sub _onpub_next {
 # Play previous song in playlist.
 #
 sub _onpub_prev {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _commands => [ 'previous' ],
-        _cooking  => $RAW,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg = $_[ARG0];
+    $msg->_answer   ( $DISCARD );
+    $msg->_commands ( [ 'previous' ] );
+    $msg->_cooking  ( $RAW );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -496,37 +458,27 @@ sub _onpub_prev {
 # then the perl module will try and seek to $time in the current song.
 #
 sub _onpub_seek {
-    my ($time, $song) = @_[ARG0, ARG1];
+    my ($k, $msg) = @_[KERNEL, ARG0];
+
+    my ($time, $song) = @{ $msg->_params }[0,1];
     $time ||= 0; $time = int $time;
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _cooking  => $RAW,
-    } );
+    if ( not defined $song )  {
+        if ( not defined $msg->data ) {
+            # no status yet - fire an event
+            $msg->_dispatch  ( 'status' );
+            $msg->_post_to   ( $MPD );
+            $msg->_post_event( 'seek' );
+            $k->post( $MPD, '_dispatch', $msg );
+            return;
+        }
 
-    if ( defined $song ) {
-        $msg->_commands( [ "seek $song $time" ] );
-    } else {
-        $msg->_pre_from( '_seek_need_current' );
-        $msg->_pre_event( 'status' );
-        $msg->_pre_data( $time );
+        $song = $msg->data->song;
     }
-    $_[KERNEL]->yield( '_send', $msg );
-}
 
-
-#
-# event: _seek_need_current( $msg, $current )
-#
-# Use $current to get current song, before sending real seek $msg.
-#
-sub _onpriv_seek_need_current {
-    my ($msg, $current) = @_[ARG0, ARG1];
-    my $song = $current->data->song;
-    my $time = $msg->_pre_data;
+    $msg->_cooking ( $RAW );
+    $msg->_answer  ( $DISCARD );
     $msg->_commands( [ "seek $song $time" ] );
-    $_[KERNEL]->yield( '_send', $msg );
+    $k->post( $_HUB, '_send', $msg );
 }
 
 
@@ -537,37 +489,27 @@ sub _onpriv_seek_need_current {
 # then the perl module will try and seek to $time in the current song.
 #
 sub _onpub_seekid {
-    my ($time, $song) = @_[ARG0, ARG1];
+    my ($k, $msg) = @_[KERNEL, ARG0];
+
+    my ($time, $songid) = @{ $msg->_params }[0,1];
     $time ||= 0; $time = int $time;
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $DISCARD,
-        _cooking  => $RAW,
-    } );
+    if ( not defined $songid )  {
+        if ( not defined $msg->data ) {
+            # no status yet - fire an event
+            $msg->_dispatch  ( 'status' );
+            $msg->_post_to   ( $MPD );
+            $msg->_post_event( 'seek' );
+            $k->post( $MPD, '_dispatch', $msg );
+            return;
+        }
 
-    if ( defined $song ) {
-        $msg->_commands( [ "seekid $song $time" ] );
-    } else {
-        $msg->_pre_from( '_seekid_need_current' );
-        $msg->_pre_event( 'status' );
-        $msg->_pre_data( $time );
+        $songid = $msg->data->songid;
     }
-    $_[KERNEL]->yield( '_send', $msg );
-}
 
-
-#
-# event: _seekid_need_current( $msg, $current )
-#
-# Use $current to get current song, before sending real seekid $msg.
-#
-sub _onpriv_seekid_need_current {
-    my ($msg, $current) = @_[ARG0, ARG1];
-    my $song = $current->data->song;
-    my $time = $msg->_pre_data;
-    $msg->_commands( [ "seekid $song $time" ] );
-    $_[KERNEL]->yield( '_send', $msg );
+    $msg->_cooking ( $RAW );
+    $msg->_answer  ( $DISCARD );
+    $msg->_commands( [ "seekid $songid $time" ] );
+    $k->post( $_HUB, '_send', $msg );
 }
 
 

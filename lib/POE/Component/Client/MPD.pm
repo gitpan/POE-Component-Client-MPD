@@ -14,18 +14,27 @@ use warnings;
 
 use Audio::MPD::Common::Stats;
 use Audio::MPD::Common::Status;
+use Carp;
 use List::MoreUtils qw[ firstidx ];
 use POE;
-use POE::Component::Client::MPD::Collection;
-use POE::Component::Client::MPD::Commands;
 use POE::Component::Client::MPD::Connection;
 use POE::Component::Client::MPD::Message;
-use POE::Component::Client::MPD::Playlist;
-use base qw[ Class::Accessor::Fast ];
+use Readonly;
+
+use base qw[ Class::Accessor::Fast Exporter ];
 __PACKAGE__->mk_accessors( qw[ _host _password _port  _version ] );
+our @EXPORT_OK   = qw[ $MPD $COLLECTION $PLAYLIST $_HUB ];
+our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
 
-our $VERSION = '0.7.1';
+# exportable variables
+Readonly our $MPD        => '_pococ_mpd_commands';
+Readonly our $COLLECTION => '_pococ_mpd_collection';
+Readonly our $PLAYLIST   => '_pococ_mpd_playlist';
+Readonly our $_HUB       => '_pococ_mpd_hub';
+
+
+our $VERSION = '0.8.0';
 
 
 #
@@ -48,9 +57,9 @@ our $VERSION = '0.7.1';
 sub spawn {
     my ($type, $args) = @_;
 
-    my $collection = POE::Component::Client::MPD::Collection->new;
-    my $commands   = POE::Component::Client::MPD::Commands->new;
-    my $playlist   = POE::Component::Client::MPD::Playlist->new;
+    require POE::Component::Client::MPD::Collection;
+    require POE::Component::Client::MPD::Commands;
+    require POE::Component::Client::MPD::Playlist;
 
     my $session = POE::Session->create(
         args          => [ $args ],
@@ -62,115 +71,74 @@ sub spawn {
             '_mpd_data'                => \&_onprot_mpd_data,
             '_mpd_error'               => \&_onprot_mpd_error,
             '_mpd_version'             => \&_onprot_mpd_version,
-            # public events
-            'disconnect'               => \&_onpub_disconnect,
+            '_disconnect'              => \&_onprot_disconnect,
+            '_version'                 => \&_onprot_version,
         },
-        object_states => [
-            $commands   => { # general purpose commands
-                # -- MPD interaction: general commands
-                'version'              => '_onpub_version',
-                'kill'                 => '_onpub_kill',
-# #                 'password'             => '_onpub_password',
-                'updatedb'             => '_onpub_updatedb',
-                'urlhandlers'          => '_onpub_urlhandlers',
-                # -- MPD interaction: handling volume & output
-                'volume'               => '_onpub_volume',
-                '_volume_status'       => '_onpriv_volume_status',
-                'output_enable'        => '_onpub_output_enable',
-                'output_disable'       => '_onpub_output_disable',
-                # -- MPD interaction: retrieving info from current state
-                'stats'                => '_onpub_stats',
-                'status'               => '_onpub_status',
-                'current'              => '_onpub_current',
-                'song'                 => '_onpub_song',
-                'songid'               => '_onpub_songid',
-                # -- MPD interaction: altering settings
-                'repeat'               => '_onpub_repeat',
-                '_repeat_status'       => '_onpriv_repeat_status',
-                'random'               => '_onpub_random',
-                '_random_status'       => '_onpriv_random_status',
-                'fade'                 => '_onpub_fade',
-                # -- MPD interaction: controlling playback
-                'play'                 => '_onpub_play',
-                'playid'               => '_onpub_playid',
-                'pause'                => '_onpub_pause',
-                'stop'                 => '_onpub_stop',
-                'next'                 => '_onpub_next',
-                'prev'                 => '_onpub_prev',
-                'seek'                 => '_onpub_seek',
-                '_seek_need_current'   => '_onpriv_seek_need_current',
-                'seekid'               => '_onpub_seekid',
-                '_seekid_need_current' => '_onpriv_seek_need_current',
-            },
-            $collection => { # collection related commands
-                # -- Collection: retrieving songs & directories
-                'coll.all_items'        => '_onpub_all_items',
-                'coll.all_items_simple' => '_onpub_all_items_simple',
-                'coll.items_in_dir'     => '_onpub_items_in_dir',
-                # -- Collection: retrieving the whole collection
-# #                 'coll.all_songs'        => '_onpub_all_songs',
-                'coll.all_albums'       => '_onpub_all_albums',
-                'coll.all_artists'      => '_onpub_all_artists',
-                'coll.all_titles'       => '_onpub_all_titles',
-                'coll.all_files'        => '_onpub_all_files',
-                # -- Collection: picking songs
-                'coll.song'             => '_onpub_song',
-                'coll.songs_with_filename_partial' => '_onpub_songs_with_filename_partial',
-                # -- Collection: songs, albums & artists relations
-                'coll.albums_by_artist' => '_onpub_albums_by_artist',
-                'coll.songs_by_artist'  => '_onpub_songs_by_artist',
-                'coll.songs_by_artist_partial' => '_onpub_songs_by_artist_partial',
-                'coll.songs_from_album' => '_onpub_songs_from_album',
-                'coll.songs_from_album_partial' => '_onpub_songs_from_album_partial',
-                'coll.songs_with_title' => '_onpub_songs_with_title',
-                'coll.songs_with_title_partial' => '_onpub_songs_with_title_partial',
-            },
-            $playlist   => { # playlist related commands
-                # -- Playlist: retrieving information
-                'pl.as_items'            => '_onpub_as_items',
-                'pl.items_changed_since' => '_onpub_items_changed_since',
-                # -- Playlist: adding / removing songs
-                'pl.add'               => '_onpub_add',
-                'pl.delete'            => '_onpub_delete',
-                'pl.deleteid'          => '_onpub_deleteid',
-                'pl.clear'             => '_onpub_clear',
-                'pl.crop'              => '_onpub_crop',
-                '_crop_status'         => '_onpriv_crop_status',
-                # -- Playlist: changing playlist order
-                'pl.shuffle'           => '_onpub_shuffle',
-                'pl.swap'              => '_onpub_swap',
-                'pl.swapid'            => '_onpub_swapid',
-                'pl.move'              => '_onpub_move',
-                'pl.moveid'            => '_onpub_moveid',
-                # -- Playlist: managing playlists
-                'pl.load'              => '_onpub_load',
-                'pl.save'              => '_onpub_save',
-                'pl.rm'                => '_onpub_rm',
-            },
-        ],
     );
+
+    POE::Component::Client::MPD::Collection->_spawn;
+    POE::Component::Client::MPD::Commands->_spawn;
+    POE::Component::Client::MPD::Playlist->_spawn;
 
     return $session->ID;
 }
 
 
-#--
-# public events
+sub _onpub_default {
+    my ($event, $params) = @_[ARG0, ARG1];
 
-#
-# event: disconnect()
-#
-# Request the pococm to be shutdown. Leave mpd running.
-#
-sub _onpub_disconnect {
-    my ($k,$h) = @_[KERNEL, HEAP];
-    $k->alias_remove( $h->{alias} ) if defined $h->{alias}; # refcount--
-    $k->post( $h->{_socket}, 'disconnect' );                # pococm-conn
+    my $from = $_[SENDER]->ID;
+    my $to   = $_[SESSION]->ID;
+#     warn "caught $event ($from -> $to)\n";
+    die "should not be there! caught $event ($from -> $to)"
+        if $_[SENDER] == $_[SESSION];
+#     return unless exists $allowed{$event};
+
+    my $msg = POE::Component::Client::MPD::Message->new( {
+        _from       => $_[SENDER]->ID,
+        _request    => $event,  # /!\ $_[STATE] eq 'default'
+        _params     => $params,
+        _dispatch   => $event,
+        #_answer    => <to be set by handler>
+        #_commands  => <to be set by handler>
+        #_cooking   => <to be set by handler>
+        #_transform => <to be set by handler>
+        #_post      => <to be set by handler>
+    } );
+    $_[KERNEL]->yield( '_dispatch', $msg );
 }
 
 
 #--
 # protected events.
+
+#
+# event: _disconnect()
+#
+# Request the pococm to be shutdown. Leave mpd running.
+#
+sub _onprot_disconnect {
+    my ($k,$h) = @_[KERNEL, HEAP];
+    $k->alias_remove( $h->{alias} ) if defined $h->{alias}; # refcount--
+    $k->alias_remove( $_HUB );
+    $k->post( $h->{_socket}, 'disconnect' );    # pococm-conn
+    $k->post( $PLAYLIST,     '_disconnect' );    # pococm-playlist
+    $k->post( $COLLECTION,   '_disconnect' );    # pococm-coll
+}
+
+
+#
+# event: _version()
+#
+# Fill in the mpd version, and fakes that we received some data to send
+# version back to requester.
+#
+sub _onprot_version {
+    my ($k,$h,$msg) = @_[KERNEL, HEAP, ARG0];
+    $msg->data( $_[HEAP]->{version} );
+    $k->yield( '_mpd_data', $msg );
+}
+
 
 #
 # Event: _mpd_data( $msg )
@@ -209,9 +177,10 @@ sub _onprot_mpd_data {
     # check for post-callback.
     # need to be before pre-callback, since a pre-event may need to have
     # a post-callback.
-    if ( defined $msg->_post ) {
-        $k->yield( $msg->_post, $msg ); # need a post-treatment...
-        $msg->_post( undef );           # remove postback.
+    if ( defined $msg->_post_event ) {
+        $msg->_dispatch( $msg->_post_event );
+        $msg->_post_event( undef );           # remove postback.
+        $k->post( $msg->_post_to, '_dispatch', $msg ); # need a post-treatment...
         return;
     }
 
@@ -274,6 +243,7 @@ sub _onpriv_start {
     # set an alias (for easier communication) if requested.
     $h->{alias} = delete $params{alias};
     $_[KERNEL]->alias_set($h->{alias}) if defined $h->{alias};
+    $_[KERNEL]->alias_set( $_HUB );
 
     $h->{password} = delete $params{password};
     $h->{_socket}  = POE::Component::Client::MPD::Connection->spawn(\%params);

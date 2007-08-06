@@ -12,8 +12,45 @@ package POE::Component::Client::MPD::Collection;
 use strict;
 use warnings;
 
-use POE  qw[ Component::Client::MPD::Message ];
+use POE;
+use POE::Component::Client::MPD qw[ :all ];
+use POE::Component::Client::MPD::Message;
+use Readonly;
+
 use base qw[ Class::Accessor::Fast ];
+
+Readonly my @EVENTS => qw[
+    all_items all_items_simple items_in_dir
+    all_albums all_artists all_titles all_files
+    song songs_with_filename_partial
+    albums_by_artist
+        songs_by_artist  songs_by_artist_partial
+        songs_from_album songs_from_album_partial
+        songs_with_title songs_with_title_partial
+];
+
+sub _spawn {
+    my $object = __PACKAGE__->new;
+    my $session = POE::Session->create(
+        inline_states => {
+            '_start'      => sub { $_[KERNEL]->alias_set( $COLLECTION ) },
+            '_default'    => \&POE::Component::Client::MPD::_onpub_default,
+            '_dispatch'   => \&_onpriv_dispatch,
+            '_disconnect' => sub { $_[KERNEL]->alias_remove( $COLLECTION ) },
+        },
+        object_states => [ $object => [ map { "_onpub_$_" } @EVENTS ] ]
+    );
+
+    return $session->ID;
+}
+
+sub _onpriv_dispatch {
+    my $msg = $_[ARG0];
+    my $event = $msg->_dispatch;
+    $event =~ s/^[^.]\.//;
+#     warn "dispatching $event\n";
+    $_[KERNEL]->yield( "_onpub_$event", $msg );
+}
 
 
 # -- Collection: retrieving songs & directories
@@ -27,16 +64,13 @@ use base qw[ Class::Accessor::Fast ];
 # songs and dirs in this directory.
 #
 sub _onpub_all_items {
-    my $path = $_[ARG0];
-    $path ||= '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ qq[listallinfo "$path"] ],
-        _cooking  => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $path = $msg->_params->[0] || '';
+
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[listallinfo "$path"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -54,16 +88,13 @@ sub _onpub_all_items {
 # other thing than a quick scan!
 #
 sub _onpub_all_items_simple {
-    my $path = $_[ARG0];
-    $path ||= '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ qq[listall "$path"] ],
-        _cooking  => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $path = $msg->_params->[0] || '';
+
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[listall "$path"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -75,16 +106,13 @@ sub _onpub_all_items_simple {
 # Note that this sub does not work recusrively on all directories.
 #
 sub _onpub_items_in_dir {
-    my $path = $_[ARG0];
-    $path ||= '';
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ qq[lsinfo "$path"] ],
-        _cooking  => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $path = $msg->_params->[0] || '';
+
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[lsinfo "$path"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -100,14 +128,11 @@ sub _onpub_items_in_dir {
 # Return the list of all albums (strings) currently known by mpd.
 #
 sub _onpub_all_albums {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'list album' ],
-        _cooking  => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'list album' ] );
+    $msg->_cooking  ( $STRIP_FIRST );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -117,14 +142,11 @@ sub _onpub_all_albums {
 # Return the list of all artists (strings) currently known by mpd.
 #
 sub _onpub_all_artists {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'list artist' ],
-        _cooking  => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'list artist' ] );
+    $msg->_cooking  ( $STRIP_FIRST );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -134,14 +156,11 @@ sub _onpub_all_artists {
 # Return the list of all titles (strings) currently known by mpd.
 #
 sub _onpub_all_titles {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'list title' ],
-        _cooking  => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'list title' ] );
+    $msg->_cooking  ( $STRIP_FIRST );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -152,15 +171,13 @@ sub _onpub_all_titles {
 # currently known by mpd.
 #
 sub _onpub_all_files {
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from     => $_[SENDER]->ID,
-        _request  => $_[STATE],
-        _answer   => $SEND,
-        _commands => [ 'list filename' ],
-        _cooking  => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ 'list filename' ] );
+    $msg->_cooking  ( $STRIP_FIRST );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
+
 
 # -- Collection: picking songs
 
@@ -170,16 +187,13 @@ sub _onpub_all_files {
 # Return the AMC::Item::Song which correspond to $path.
 #
 sub _onpub_song {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[find filename "$what"] ],
-        _cooking   => $AS_ITEMS,
-        _transform => $AS_SCALAR,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[find filename "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $msg->_transform( $AS_SCALAR );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -189,15 +203,12 @@ sub _onpub_song {
 # Return the AMC::Item::Songs containing $string in their path.
 #
 sub _onpub_songs_with_filename_partial {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[search filename "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[search filename "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -210,15 +221,12 @@ sub _onpub_songs_with_filename_partial {
 # participated.
 #
 sub _onpub_albums_by_artist {
-    my $artist = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[list album "$artist"] ],
-        _cooking   => $STRIP_FIRST,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[list album "$what"] ] );
+    $msg->_cooking  ( $STRIP_FIRST );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -228,15 +236,12 @@ sub _onpub_albums_by_artist {
 # Return all AMC::Item::Songs performed by $artist.
 #
 sub _onpub_songs_by_artist {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[find artist "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[find artist "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -246,15 +251,12 @@ sub _onpub_songs_by_artist {
 # Return all AMC::Item::Songs performed by $artist.
 #
 sub _onpub_songs_by_artist_partial {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[search artist "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[search artist "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -264,15 +266,12 @@ sub _onpub_songs_by_artist_partial {
 # Return all AMC::Item::Songs appearing in $album.
 #
 sub _onpub_songs_from_album {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[find album "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[find album "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -282,15 +281,12 @@ sub _onpub_songs_from_album {
 # Return all AMC::Item::Songs appearing in album containing $string.
 #
 sub _onpub_songs_from_album_partial {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[search album "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[search album "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -300,15 +296,12 @@ sub _onpub_songs_from_album_partial {
 # Return all AMC::Item::Songs which title is exactly $title.
 #
 sub _onpub_songs_with_title {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[find title "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[find title "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
@@ -318,15 +311,12 @@ sub _onpub_songs_with_title {
 # Return all AMC::Item::Songs where $string is part of the title.
 #
 sub _onpub_songs_with_title_partial {
-    my $what = $_[ARG0];
-    my $msg = POE::Component::Client::MPD::Message->new( {
-        _from      => $_[SENDER]->ID,
-        _request   => $_[STATE],
-        _answer    => $SEND,
-        _commands  => [ qq[search title "$what"] ],
-        _cooking   => $AS_ITEMS,
-    } );
-    $_[KERNEL]->yield( '_send', $msg );
+    my $msg  = $_[ARG0];
+    my $what = $msg->_params->[0];
+    $msg->_answer   ( $SEND );
+    $msg->_commands ( [ qq[search title "$what"] ] );
+    $msg->_cooking  ( $AS_ITEMS );
+    $_[KERNEL]->post( $_HUB, '_send', $msg );
 }
 
 
