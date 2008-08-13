@@ -1,40 +1,66 @@
 #!perl
 #
 # This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007 Jerome Quelin, all rights reserved.
+# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
 #
 #
 
+use 5.010;
 use strict;
 use warnings;
 
-use POE qw[ Component::Client::MPD::Connection ];
-use Test::More;
-plan tests => 1;
+use POE qw{ Component::Client::MPD::Connection };
+use Readonly;
+use Test::More tests => 4;
 
+Readonly my $ALIAS => 'tester';
+
+
+my $max_retries = 3;
 my $id = POE::Session->create(
     inline_states => {
-        _start     => \&_onpriv_start,
-        _mpd_error => \&_onpriv_mpd_error,
+        _start                      => \&_onpriv_start,
+        mpd_connect_error_retriable => \&_onprot_mpd_connect_error_retriable,
+        mpd_connect_error_fatal     => \&_onprot_mpd_connect_error_fatal,
     }
 );
-POE::Component::Client::MPD::Connection->spawn( {
-    host => 'localhost',
-    port => 16600,
-    id   => $id,
+my $conn = POE::Component::Client::MPD::Connection->spawn( {
+    host        => 'localhost',
+    port        => 16600,
+    id          => $id,
+    retry_wait  => 0,
+    max_retries => $max_retries,
 } );
 POE::Kernel->run;
 exit;
 
+#--
 
 sub _onpriv_start {
-    $_[KERNEL]->alias_set('tester'); # increment refcount
+    my ($k, $h) = @_[KERNEL, HEAP];
+    $k->alias_set($ALIAS); # increment refcount
+    $h->{count} = 0;
 }
 
-sub _onpriv_mpd_error  {
-    like( $_[ARG0]->error, qr/^connect: \(\d+\) /, 'connect error trapped' );
+sub _onprot_mpd_connect_error_retriable {
+    my ($k, $h, $errstr) = @_[KERNEL, HEAP, ARG0];
+    like($errstr, qr/^connect: \(\d+\) /, 'retriable error trapped');
+    $h->{count}++;
 }
+
+sub _onprot_mpd_connect_error_fatal {
+    my ($k, $h, $errstr) = @_[KERNEL, HEAP, ARG0];
+
+    # checks
+    is($h->{count}, $max_retries-1, 'retriable errors are tried again $max_retries times');
+    like($errstr, qr/^Too many failed attempts!/, 'too many errors lead to fatal error');
+
+    # cleanup
+    $k->post($conn, 'disconnect');
+    $k->alias_remove($ALIAS); # decrement refcount
+}
+
 

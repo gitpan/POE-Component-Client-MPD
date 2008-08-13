@@ -1,6 +1,6 @@
 #
 # This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007 Jerome Quelin, all rights reserved.
+# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself.
@@ -12,37 +12,35 @@ package POE::Component::Client::MPD::Test;
 use strict;
 use warnings;
 
-use FindBin qw[ $Bin ];
+use FindBin qw{ $Bin };
 use POE;
-use POE::Component::Client::MPD qw[ :all ];
+use POE::Component::Client::MPD;
 use POE::Component::Client::MPD::Message;
 use Readonly;
 use Test::More;
 
-use base qw[ Exporter ];
-our @EXPORT = qw[ customize_test_mpd_configuration start_test_mpd stop_test_mpd ];
+use base qw{ Exporter };
+our @EXPORT = qw{ customize_test_mpd_configuration start_test_mpd stop_test_mpd };
 
-#our ($VERSION) = '$Rev: 5727 $' =~ /(\d+)/;
 
 Readonly my $ALIAS    => 'tester';
 Readonly my $TEMPLATE => "$Bin/mpd-test/mpd.conf.template";
 Readonly my $CONFIG   => "$Bin/mpd-test/mpd.conf";
 
+my $was_running = 0;   # whether there was a user mpd running
+my $start_ok    = 0;   # whether the test mpd was started ok
 
 sub import { # this will be run when pococm::Test will be use-d.
     my $self   = shift;
     my %params = @_;
 
-    my $restart = 0;
-    my $stopit  = 0;
-
     customize_test_mpd_configuration();
-    $restart = _stop_user_mpd_if_needed();
-    $stopit  = start_test_mpd();
+    $was_running = _stop_user_mpd_if_needed();
+    $start_ok    = start_test_mpd();
 
     END {
-        stop_test_mpd() if $stopit;
-        return unless $restart;       # no need to restart
+        stop_test_mpd() if $start_ok;
+        return unless $was_running;   # no need to restart
         system 'mpd 2>/dev/null';     # restart user mpd
         sleep 1;                      # wait 1 second to let mpd start.
     }
@@ -50,11 +48,12 @@ sub import { # this will be run when pococm::Test will be use-d.
     return if exists $params{dont_start_poe};
 
     # fake mpd has been started successfully, plan the tests.
-    plan tests => $::nbtests;
+    plan tests => $params{nbtests};
 
     # fire pococm + create session to follow the tests.
     POE::Component::Client::MPD->spawn( { alias => 'mpd' } );
     POE::Session->create(
+        args => \%params,
         inline_states => {
             _start     => \&_onpriv_start,
             mpd_result => \&_onpub_mpd_result,
@@ -108,7 +107,7 @@ sub customize_test_mpd_configuration {
 # Start the fake mpd, and die if there were any error.
 #
 sub start_test_mpd {
-    my $output = qx[mpd $CONFIG 2>&1];
+    my $output = qx{mpd $CONFIG 2>&1};
     die "could not start fake mpd: $output\n" if $output;
     sleep 1;   # wait 1 second to let mpd start.
     return 1;
@@ -141,7 +140,7 @@ sub stop_test_mpd {
 #
 sub _stop_user_mpd_if_needed {
     # check if mpd is running.
-    my $is_running = grep { /mpd$/ } qx[ ps -e ];
+    my $is_running = grep { /mpd$/ } qx{ ps -e };
 
     return 0 unless $is_running; # mpd does not run - nothing to do.
 
@@ -162,24 +161,18 @@ sub _stop_user_mpd_if_needed {
 # Called to schedule the next test.
 #
 sub _onpub_next_test {
-    my $k = $_[KERNEL];
+    my ($k,$h) = @_[KERNEL, HEAP];
 
-    if ( scalar @::tests == 0 ) { # no more tests.
+    if ( scalar @{ $h->{tests} } == 0 ) { # no more tests.
         $k->alias_remove($ALIAS);
-        $k->post( $MPD, 'disconnect' );
+        $k->post('mpd', 'disconnect');
         return;
     }
 
     # post next event.
-    my $session = $::tests[0][0];
-    my $event   = $::tests[0][1];
-    my $args    = $::tests[0][2];
-    $k->post( $session, $event, @$args );
-
-    return if $::tests[0][3] == $SEND;
-    $k->delay_set( 'next_test', 1 ) if $::tests[0][3] == $SLEEP1;
-    $k->yield( 'next_test' )        if $::tests[0][3] == $DISCARD;
-    shift @::tests;
+    my $event = $h->{tests}[0][0];
+    my $args  = $h->{tests}[0][1];
+    $k->post( 'mpd', $event, @$args );
 }
 
 
@@ -189,9 +182,10 @@ sub _onpub_next_test {
 # Called when mpd talks back, with $msg as a pococm-message param.
 #
 sub _onpub_mpd_result {
-    $::tests[0][4]->( $_[ARG0] );      # check if everything went fine
-    shift @::tests;                    # remove test being played
-    $_[KERNEL]->yield( 'next_test' );  # call next test
+    my ($k, $h, $msg, $results) = @_[KERNEL, HEAP, ARG0, ARG1];
+    $h->{tests}[0][3]->($msg, $results);             # check if everything went fine
+    $k->delay_set('next_test'=>$h->{tests}[0][2]);   # call next test after some time
+    shift @{ $h->{tests} };                          # remove test being played
 }
 
 
@@ -204,8 +198,9 @@ sub _onpub_mpd_result {
 # Called when the poe session has started.
 #
 sub _onpriv_start {
-    my $k = $_[KERNEL];
+    my ($k, $h, $args) = @_[KERNEL, HEAP, ARG0];
     $k->alias_set($ALIAS);           # increment refcount
+    $h->{tests} = $args->{tests};    # store tests
     $k->yield( 'next_test' );        # launch the first test.
 }
 
@@ -286,12 +281,12 @@ section C<SEE ALSO>
 
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin at cpan.org> >>
+Jerome Quelin, C<< <jquelin@cpan.org> >>
 
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (c) 2007 Jerome Quelin, all rights reserved.
+Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
