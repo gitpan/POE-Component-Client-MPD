@@ -1,16 +1,20 @@
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
-
-package POE::Component::Client::MPD::Commands;
-
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
+use 5.010;
 use strict;
 use warnings;
+
+package POE::Component::Client::MPD::Commands;
+our $VERSION = '0.9.4';
+
+
+# ABSTRACT: module handling basic mpd commands
 
 use POE;
 use POE::Component::Client::MPD::Message;
@@ -460,13 +464,18 @@ sub _do_seekid {
 
 1;
 
-__END__
+
+
+
+=pod
 
 =head1 NAME
 
 POE::Component::Client::MPD::Commands - module handling basic mpd commands
 
+=head1 VERSION
 
+version 0.9.4
 
 =head1 DESCRIPTION
 
@@ -481,15 +490,11 @@ or methods from this module directly.
 
 Read POCOCM's pod to learn how to deal with answers from those commands.
 
-
-
 =head1 PUBLIC EVENTS
 
 The following is a list of general purpose events accepted by POCOCM.
 
-
 =head2 General commands
-
 
 =over 4
 
@@ -500,11 +505,9 @@ mpd returns B<protocol> version when connected. This protocol version can
 differ from the real mpd version. eg, mpd version 0.13.2 is "speaking"
 and thus advertising version 0.13.0.
 
-
 =item * kill()
 
 Kill the mpd server, and request the pococm to be shutdown.
-
 
 =item * updatedb( [$path] )
 
@@ -512,18 +515,13 @@ Force mpd to rescan its collection. If C<$path> (relative to MPD's music
 directory) is supplied, MPD will only scan it - otherwise, MPD will
 rescan its whole collection.
 
-
 =item * urlhandlers()
 
 Return an array of supported URL schemes.
 
-
-=back
-
-
+=back 
 
 =head2 Handling volume & output
-
 
 =over 4
 
@@ -533,24 +531,18 @@ Sets the audio output volume percentage to absolute C<$volume>. If
 C<$volume> is prefixed by '+' or '-' then the volume is changed
 relatively by that value.
 
-
 =item * output_enable( $output )
 
 Enable the specified audio output. C<$output> is the ID of the audio
 output.
 
-
 =item * output_disable( $output )
 
 Disable the specified audio output. C<$output> is the ID of the audio output.
 
-
-=back
-
-
+=back 
 
 =head2 Retrieving info from current state
-
 
 =over 4
 
@@ -559,37 +551,29 @@ Disable the specified audio output. C<$output> is the ID of the audio output.
 Return an L<Audio::MPD::Common::Stats> object with the current
 statistics of MPD.
 
-
 =item * status ()
 
 Return an L<Audio::MPD::Common::Status> object with the current
 status of MPD.
-
 
 =item * current()
 
 Return an L<Audio::MPD::Common::Item::Song> representing the song
 currently playing.
 
-
 =item * song( [$song] )
 
 Return an L<Audio::MPD::Common::Item::Song> representing the song number
 C<$song>. If C<$song> is not supplied, returns the current song.
-
 
 =item * songid( [$songid] )
 
 Return an L<Audio::MPD::Common::Item::Song> representing the song id
 C<$songid>. If C<$songid> is not supplied, returns the current song.
 
-
-=back
-
-
+=back 
 
 =head2 Altering settings
-
 
 =over 4
 
@@ -598,26 +582,20 @@ C<$songid>. If C<$songid> is not supplied, returns the current song.
 Set the repeat mode to C<$repeat> (1 or 0). If C<$repeat> is not
 specified then the repeat mode is toggled.
 
-
 =item * fade( [$seconds] )
 
 Enable crossfading and set the duration of crossfade between songs. If
 C<$seconds> is not specified or C<$seconds> is 0, then crossfading is
 disabled.
 
-
 =item * random( [$random] )
 
 Set the random mode to C<$random> (1 or 0). If C<$random> is not
 specified then the random mode is toggled.
 
-
-=back
-
-
+=back 
 
 =head2 Controlling playback
-
 
 =over 4
 
@@ -626,12 +604,10 @@ specified then the random mode is toggled.
 Begin playing playlist at song number C<$song>. If no argument supplied,
 resume playing.
 
-
 =item * playid( [$song] )
 
 Begin playing playlist at song ID C<$song>. If no argument supplied,
 resume playing.
-
 
 =item * pause( [$sate] )
 
@@ -640,21 +616,17 @@ C<$state> is 1 then the current track is paused.
 
 Note that if C<$state> is not given, pause state will be toggled.
 
-
 =item * stop()
 
 Stop playback.
-
 
 =item * next()
 
 Play next song in playlist.
 
-
 =item * prev()
 
 Play previous song in playlist.
-
 
 =item * seek( $time, [$song] )
 
@@ -662,37 +634,27 @@ Seek to C<$time> seconds in song number C<$song>. If C<$song> number is
 not specified then the perl module will try and seek to C<$time> in the
 current song.
 
-
 =item * seekid( $time, [$songid] )
 
 Seek to C<$time> seconds in song ID C<$songid>. If C<$songid> number is
 not specified then the perl module will try and seek to C<$time> in the
 current song.
 
-
-=back
-
-
-
-=head1 SEE ALSO
-
-For all related information (bug reporting, mailing-list, pointers to
-MPD and POE, etc.), refer to L<POE::Component::Client::MPD>'s pod,
-section C<SEE ALSO>
-
-
+=back 
 
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin@cpan.org> >>
+  Jerome Quelin
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2007 by Jerome Quelin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut 
 
 
 
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
+__END__

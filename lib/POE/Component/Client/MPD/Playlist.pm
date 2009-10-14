@@ -1,16 +1,20 @@
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
-
-package POE::Component::Client::MPD::Playlist;
-
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
+use 5.010;
 use strict;
 use warnings;
+
+package POE::Component::Client::MPD::Playlist;
+our $VERSION = '0.9.4';
+
+
+# ABSTRACT: module handling playlist commands
 
 use POE;
 use POE::Component::Client::MPD::Message;
@@ -289,13 +293,18 @@ sub _do_rm {
 
 1;
 
-__END__
+
+
+
+=pod
 
 =head1 NAME
 
 POE::Component::Client::MPD::Playlist - module handling playlist commands
 
+=head1 VERSION
 
+version 0.9.4
 
 =head1 DESCRIPTION
 
@@ -310,15 +319,11 @@ or methods from this module directly.
 
 Read POCOCM's pod to learn how to deal with answers from those commands.
 
-
-
 =head1 PUBLIC EVENTS
 
 The following is a list of playlist-related events accepted by POCOCM.
 
-
 =head2 Retrieving information
-
 
 =over 4
 
@@ -327,19 +332,14 @@ The following is a list of playlist-related events accepted by POCOCM.
 Return an array of L<Audio::MPD::Common::Item::Song>s, one for each of
 the songs in the current playlist.
 
-
 =item * pl.items_changed_since( $plversion )
 
 Return a list with all the songs (as L<Audio::MPD::Common::Item::Song>
 objects) added to the playlist since playlist C<$plversion>.
 
-
-=back
-
-
+=back 
 
 =head2 Adding / removing songs
-
 
 =over 4
 
@@ -348,34 +348,26 @@ objects) added to the playlist since playlist C<$plversion>.
 Add the songs identified by C<$path> (relative to MPD's music directory)
 to the current playlist.
 
-
 =item * pl.delete( $number, $number, ... )
 
 Remove song C<$number> (starting from 0) from the current playlist.
-
 
 =item * pl.deleteid( $songid, $songid, ... )
 
 Remove the specified C<$songid> (as assigned by mpd when inserted in
 playlist) from the current playlist.
 
-
 =item * clear()
 
 Remove all the songs from the current playlist.
-
 
 =item * crop()
 
 Remove all of the songs from the current playlist *except* the current one.
 
-
-=back
-
-
+=back 
 
 =head2 Changing playlist order
-
 
 =over 4
 
@@ -383,35 +375,27 @@ Remove all of the songs from the current playlist *except* the current one.
 
 Shuffle the current playlist.
 
-
 =item * pl.swap( $song1, $song2 )
 
 Swap positions of song number C<$song1> and C<$song2> in the current
 playlist.
-
 
 =item * pl.swapid( $songid1, $songid2 )
 
 Swap positions of song id C<$songid1> and C<$songid2> in the current
 playlist.
 
-
 =item * pl.move( $song, $newpos )
 
 Move song number C<$song> to the position C<$newpos>.
-
 
 =item * pl.moveid( $songid, $newpos )
 
 Move song id C<$songid> to the position C<$newpos>.
 
-
-=back
-
-
+=back 
 
 =head2 Managing playlists
-
 
 =over 4
 
@@ -419,41 +403,30 @@ Move song id C<$songid> to the position C<$newpos>.
 
 Load list of songs from specified C<$playlist> file.
 
-
 =item * pl.save( $playlist )
 
 Save the current playlist to a file called C<$playlist> in MPD's
 playlist directory.
 
-
 =item * pl.rm( $playlist )
 
 Delete playlist named C<$playlist> from MPD's playlist directory.
 
-
-=back
-
-
-
-=head1 SEE ALSO
-
-For all related information (bug reporting, mailing-list, pointers to
-MPD and POE, etc.), refer to L<POE::Component::Client::MPD>'s pod,
-section C<SEE ALSO>
-
-
+=back 
 
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin@cpan.org> >>
+  Jerome Quelin
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2007 by Jerome Quelin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut 
 
 
 
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
+__END__

@@ -1,12 +1,12 @@
 #!perl
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
 
 use strict;
 use warnings;
@@ -108,4 +108,3 @@ sub check_songs_with_title_partial {
     isa_ok($_, 'Audio::MPD::Common::Item::Song', 'songs_with_title_partial() return') for @$items;
     like($items->[0]->title, qr/title/, 'songs_with_title_partial() return correct objects');
 }
-

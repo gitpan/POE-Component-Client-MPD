@@ -1,12 +1,12 @@
 #!perl
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
 
 use 5.010;
 use strict;
@@ -62,5 +62,3 @@ sub _onprot_mpd_connect_error_fatal {
     $k->post($conn, 'disconnect');
     $k->alias_remove($ALIAS); # decrement refcount
 }
-
-

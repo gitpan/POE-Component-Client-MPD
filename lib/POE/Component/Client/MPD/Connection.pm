@@ -1,17 +1,20 @@
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
-
-package POE::Component::Client::MPD::Connection;
-
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
 use 5.010;
 use strict;
 use warnings;
+
+package POE::Component::Client::MPD::Connection;
+our $VERSION = '0.9.4';
+
+
+# ABSTRACT: module handling the tcp connection with mpd
 
 use Audio::MPD::Common::Item;
 use POE;
@@ -297,12 +300,12 @@ sub _onpriv_ConnectError {
 #
 sub _onpriv_Disconnected {
     my ($k, $h) = @_[KERNEL, HEAP];
-    return unless $h->{auto_reconnect};
 
     # signal that we're disconnected
     $k->post($h->{session}, 'mpd_disconnected');
 
     # auto-reconnect in $retry_wait seconds
+    return unless $h->{auto_reconnect};
     $k->delay_add('reconnect' => $h->{retry_wait});
 }
 
@@ -334,13 +337,18 @@ sub _onpriv_ServerInput {
 
 1;
 
-__END__
+
+
+
+=pod
 
 =head1 NAME
 
 POE::Component::Client::MPD::Connection - module handling the tcp connection with mpd
 
+=head1 VERSION
 
+version 0.9.4
 
 =head1 DESCRIPTION
 
@@ -350,8 +358,6 @@ needed.
 
 Note that you're B<not> supposed to use this class directly: it's one of the
 helper class for POCOCM.
-
-
 
 =head1 PUBLIC METHODS
 
@@ -370,36 +376,28 @@ You should provide some arguments as a hash reference, where the hash keys are:
 
 The hostname of the mpd server. Mandatory, no default.
 
-
 =item * port
 
 The port of the mpd server. Mandatory, no default.
-
 
 =item * id
 
 The POE session id of the peer to dialog with. Mandatory, no default.
 
-
 =item * max_retries
 
 How much time to attempt reconnection before giving up. Defaults to 5.
-
 
 =item * retry_wait
 
 How much time to wait (in seconds) before attempting socket
 reconnection. Defaults to 2.
 
-
-=back
-
+=back 
 
 The args without default are not supposed to be empty - ie, you will get
 an error if you don't follow those requirements! Yes, this is a private
 class, and you're not supposed to use it beyond pococm. :-)
-
-
 
 =head1 PUBLIC EVENTS ACCEPTED
 
@@ -407,12 +405,10 @@ The following events are accepted from outside this class - but of course
 restricted to POCOCM (in oo-lingo, they are more protected rather than
 public).
 
-
 =head2 disconnect()
 
 Request the pococm-connection to be shutdown. This does B<not> shut down
 the MPD server. No argument.
-
 
 =head2 send( $message )
 
@@ -420,12 +416,9 @@ Request pococm-conn to send the C<$message> over the wires. Note that
 this request is a pococm-message object properly filled up, and that the
 C<_commands()> attribute should B<not> be newline terminated.
 
-
-
 =head1 PUBLIC EVENTS FIRED
 
 The following events are fired from the spawned session.
-
 
 =head2 mpd_connected( $version )
 
@@ -433,7 +426,6 @@ Fired when the session is connected to a mpd server. This event isn't
 fired when the socket connection takes place, but when the session has
 checked that remote peer is a real mpd server. C<$version> is the
 advertised mpd server version.
-
 
 =head2 mpd_connect_error_fatal( $errstr )
 
@@ -443,20 +435,17 @@ else than a mpd server, or if there was more than C<max_retries> (see
 C<spawn()> params) connection retries in a row. C<$errstr> will contain
 the problem encountered. No retries will be done.
 
-
 =head2 mpd_connect_error_retriable( $errstr )
 
 Fired when the session has troubles connecting to the server. C<$errstr>
 will point the faulty syscall that failed. Re-connection will be tried
 after C<$retry_wait> seconds (see C<spawn()> params).
 
-
 =head2 mpd_data( $msg )
 
 Fired when C<$msg> has been sent over the wires, and mpd server has
 answered with success. The actual output should be looked up in
 C<$msg->_data>.
-
 
 =head2 mpd_disconnected()
 
@@ -465,33 +454,24 @@ that this event is B<not> fired in the case of a programmed shutdown
 (see C<disconnect()> event above). A reconnection will be automatically
 re-tried after C<$retry_wait> (see C<spawn()> params).
 
-
 =head2 mpd_error( $msg, $errstr )
 
 Fired when C<$msg> has been sent over the wires, and mpd server has
 answered with the error message C<$errstr>.
 
-
-
-=head1 SEE ALSO
-
-For all related information (bug reporting, mailing-list, pointers to
-MPD and POE, etc.), refer to L<POE::Component::Client::MPD>'s pod,
-section C<SEE ALSO>
-
-
-
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin@cpan.org> >>
+  Jerome Quelin
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2007 by Jerome Quelin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut 
 
 
 
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
+__END__

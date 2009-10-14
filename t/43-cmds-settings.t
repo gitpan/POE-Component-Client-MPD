@@ -1,12 +1,12 @@
 #!perl
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
 
 use strict;
 use warnings;
@@ -65,4 +65,3 @@ sub check_random_is_off { check_success($_[0]); is($_[1]->random, 0, 'random is 
 
 sub check_fade_is_on    { check_success($_[0]); is($_[1]->xfade, 15, 'enabling fading'); }
 sub check_fade_is_off   { check_success($_[0]); is($_[1]->xfade, 0,  'disabling fading by default'); }
-

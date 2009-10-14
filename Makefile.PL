@@ -1,38 +1,32 @@
-#!perl
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
 
-BEGIN { require 5.010; }
 use strict;
 use warnings;
+
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME          => 'POE::Component::Client::MPD',
-    AUTHOR        => 'Jerome Quelin <jquelin@cpan.org>',
-    VERSION_FROM  => 'lib/POE/Component/Client/MPD.pm',
-    ABSTRACT_FROM => 'lib/POE/Component/Client/MPD.pm',
-    PL_FILES      => {},
-    PREREQ_PM     => {
-        'Audio::MPD::Common'          => '0.1.4',
-        'Carp'                        => 0,
-        'Class::Accessor::Fast'       => 0,
-        'Exporter'                    => 0,
-        'FindBin'                     => 0,
-        'POE'                         => 0,
-        'POE::Component::Client::TCP' => 0,
-        'Readonly'                    => 0,
-        'Test::More'                  => 0,
-    },
-    dist          => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean         => { FILES => [
-		'POE-Component-Client-MPD-*', 'MANIFEST.bak',
-		map { ( '*/' x $_ ) . '*~' } 0..6
-	] },
+  DISTNAME  => 'POE-Component-Client-MPD',
+  NAME      => 'POE::Component::Client::MPD',
+  AUTHOR    => 'Jerome\ Quelin',
+  ABSTRACT  => 'full\-blown\ poe\-aware\ mpd\ client\ library',
+  VERSION   => '0.9.4',
+  EXE_FILES => [ qw() ],
+  (eval { ExtUtils::MakeMaker->VERSION(6.31) } ? (LICENSE => 'perl') : ()),
+  PREREQ_PM    => {
+    "base" => '0',
+    "English" => '0',
+    "FindBin" => '0',
+    "Readonly" => '0',
+    "Carp" => '0',
+    "POE::Component::Client::TCP" => '0',
+    "Test::More" => '0',
+    "perl" => '5.010',
+    "Audio::MPD::Common::Item" => '0',
+    "Audio::MPD::Common::Status" => '0',
+    "Audio::MPD::Common::Stats" => '0',
+    "File::Find" => '0',
+    "POE" => '0',
+  },
+  test => {TESTS => 't/*.t'}
 );
+

@@ -1,17 +1,20 @@
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
-
-package POE::Component::Client::MPD;
-
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
 use 5.010;
 use strict;
 use warnings;
+
+package POE::Component::Client::MPD;
+our $VERSION = '0.9.4';
+
+
+# ABSTRACT: full-blown poe-aware mpd client library
 
 use Audio::MPD::Common::Stats;
 use Audio::MPD::Common::Status;
@@ -24,8 +27,6 @@ use POE::Component::Client::MPD::Message;
 use POE::Component::Client::MPD::Playlist;
 
 use base qw{ Class::Accessor::Fast };
-
-our $VERSION = '0.9.3';
 
 
 #--
@@ -218,6 +219,9 @@ sub _onprot_mpd_connected {
 #
 sub _onprot_mpd_disconnected {
     my ($k, $h, $version) = @_[KERNEL, HEAP, ARG0];
+    my $peer = $h->{status_msgs_to};
+    return unless defined $peer;
+    $k->post($peer, 'mpd_disconnected');
 }
 
 
@@ -314,6 +318,23 @@ sub _onpriv_start {
 
 
 
+
+
+1;
+
+
+
+
+=pod
+
+=head1 NAME
+
+POE::Component::Client::MPD - full-blown poe-aware mpd client library
+
+=head1 VERSION
+
+version 0.9.4
+
 =begin FIXME
 
 #
@@ -334,18 +355,6 @@ sub _onpriv_send {
 
 =end FIXME
 
-=cut
-
-
-1;
-
-__END__
-
-
-=head1 NAME
-
-POE::Component::Client::MPD - a full-blown mpd client library
-
 
 
 =head1 SYNOPSIS
@@ -362,8 +371,6 @@ POE::Component::Client::MPD - a full-blown mpd client library
     # ... later on ...
     $_[KERNEL]->post( 'mpd', 'next' );
 
-
-
 =head1 DESCRIPTION
 
 POCOCM gives a clear message-passing interface (sitting on top of POE)
@@ -373,10 +380,7 @@ object is created.
 
 Commands are then sent to the server as messages are passed.
 
-
-
 =head1 PUBLIC PACKAGE METHODS
-
 
 =head2 my $id = POCOCM->spawn( \%params )
 
@@ -386,7 +390,6 @@ It will return the poe id of the session newly created.
 You can tune the pococm by passing some arguments as a hash reference, where
 the hash keys are:
 
-
 =over 4
 
 =item * host
@@ -394,23 +397,19 @@ the hash keys are:
 The hostname of the mpd server. If none given, defaults to C<MPD_HOST>
 environment variable. If this var isn't set, defaults to C<localhost>.
 
-
 =item * port
 
 The port of the mpd server. If none given, defaults to C<MPD_PORT>
 environment variable. If this var isn't set, defaults to C<6600>.
-
 
 =item * password
 
 The password to sent to mpd to authenticate the client. If none given, defaults
 to C<MPD_PASSWORD> environment variable. If this var isn't set, defaults to C<>.
 
-
 =item * alias
 
 An optional string to alias the newly created POE session.
-
 
 =item * status_msgs_to
 
@@ -420,16 +419,12 @@ although recommended. No default. When this is done, pococm will send
 pococm is connected, C<mpd_disconnected> when pococm is disconnected,
 etc. You thus need to register some handlers for those events.
 
-
-=back
-
-
+=back 
 
 =head1 PUBLIC EVENTS ACCEPTED
 
 POCOCM accepts two types of events: some are used to drive the mpd
 server, others will change the pococm status.
-
 
 =head2 MPD-related events
 
@@ -441,7 +436,6 @@ However, note that to use those events, you need to send them to the
 POCOCM session that you created with C<spawn()> (see above). Indeed, the
 logical split is only internal: you are to use the same peer.
 
-
 For a list of public events that update and/or query MPD, see embedded
 pod in:
 
@@ -451,27 +445,21 @@ pod in:
 
 L<POE::Component::Client::MPD::Commands> for general commands
 
-
 =item *
 
 L<POE::Component::Client::MPD::Playlist> for playlist-related commands.
 Those events begin with C<pl.>.
-
 
 =item *
 
 L<POE::Component::Client::MPD::Collection> for collection-related
 commands. Those events begin with C<coll.>.
 
-
-=back
-
-
+=back 
 
 =head2 POCOCM-related events
 
 Those events allow to drive the POCOCM session.
-
 
 =over 4
 
@@ -480,22 +468,17 @@ Those events allow to drive the POCOCM session.
 Request the POCOCM to be shutdown. Leave mpd running. Generally sent
 when one wants to exit her program.
 
-
-=back
-
-
+=back 
 
 =head1 PUBLIC EVENTS FIRED
 
 A POCOCM session will fire events, either to answer an incoming event,
 or to inform about some changes regarding the remote MPD server.
 
-
 =head2 Answer events
 
 For each incoming event received by the POCOCM session, it will fire
 back one of the following answers:
-
 
 =over 4
 
@@ -506,7 +489,6 @@ L<POE::Component::Client::MPD::Message> object with the original
 request, to identify the issued command (see
 L<POE::Component::Client::MPD::Message> pod for more information). Its
 C<status()> attribute is true, further confirming success.
-
 
 C<$answer> is what has been answered by the MPD server. Depending on the
 command, it can be either:
@@ -525,11 +507,10 @@ command, it can be either:
 
 =item * etc.
 
-=back
+=back 
 
 Refer to the documentation of each event to know what type of answer you
 can expect.
-
 
 =item * mpd_error( $msg, $errstr )
 
@@ -539,14 +520,10 @@ request, to identify the issued command (see
 L<POE::Component::Client::MPD::Message> pod for more information). Its
 C<status()> attribute is false, further confirming failure.
 
-
 C<$errstr> is what the error message as returned been answered by the
 MPD server.
 
-
-=back
-
-
+=back 
 
 =head2 Auto-generated events
 
@@ -559,37 +536,24 @@ The following events are fired by pococm:
 Called when pococm-conn could not connect to a mpd server. It can be
 either retriable, or fatal. Check C<$reason> for more information.
 
-
 =item * mpd_connected()
 
 Called when pococm-conn made sure we're talking to a mpd server.
 
-=back
-
-
-
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-poe-component-client-mpd at
-rt.cpan.org>, or through the web interface at
-L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=POE-Component-Client-MPD>.
-I will be notified, and then you'll automatically be notified of progress on
-your bug as I make changes.
-
-
+=back 
 
 =head1 SEE ALSO
 
 You can find more information on the mpd project on its homepage at
-L<http://www.musicpd.org>, or its wiki L<http://mpd.wikia.com>.
+L<http://www.musicpd.org>, or its wiki L<http://mpd.wikia.com>. You
+may want to have a look at L<Audio::MPD>, a non-POE aware module to
+access MPD.
 
 L<POE::Component::Client::MPD> development takes place on C<< <audio-mpd
 at googlegroups.com> >>: feel free to join us. (use
 L<http://groups.google.com/group/audio-mpd> to sign in). Our git
 repository is located at
-L<git://repo.or.cz/poe-component-client-mpd.git>, and can be browsed at
-L<http://repo.or.cz/w/poe-component-client-mpd.git>.
-
+L<http://github.com/jquelin/poe-component-client-mpd.git>.
 
 You can also look for information on this module at:
 
@@ -607,21 +571,21 @@ L<http://cpanratings.perl.org/d/POE-Component-Client-MPD>
 
 L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=POE-Component-Client-MPD>
 
-=back
-
-
+=back 
 
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin@cpan.org> >>
+  Jerome Quelin
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2007 by Jerome Quelin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut 
 
 
 
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
+__END__

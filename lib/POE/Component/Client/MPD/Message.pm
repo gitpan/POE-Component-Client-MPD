@@ -1,16 +1,20 @@
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
-
-package POE::Component::Client::MPD::Message;
-
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
+use 5.010;
 use strict;
 use warnings;
+
+package POE::Component::Client::MPD::Message;
+our $VERSION = '0.9.4';
+
+
+# ABSTRACT: a message from POCOCM
 
 use Readonly;
 
@@ -47,23 +51,27 @@ Readonly our $AS_STATUS => 2; # transform data: from kv to amc-status
 
 1;
 
-__END__
+
+
+
+=pod
 
 =head1 NAME
 
 POE::Component::Client::MPD::Message - a message from POCOCM
 
+=head1 VERSION
+
+version 0.9.4
 
 =head1 SYNOPSIS
 
     print $msg->data . "\n";
 
-
 =head1 DESCRIPTION
 
 L<POE::Component::Client::MPD::Message> is more a placeholder for a hash
 ref with some pre-defined keys.
-
 
 =head1 PUBLIC METHODS
 
@@ -78,38 +86,29 @@ The other public methods are the following accessors:
 
 The event sent to POCOCM.
 
-
 =item * params()
 
 The params of the event to POCOCM, as sent by client.
-
 
 =item * status()
 
 The status of the request. True for success, False in case of error.
 
-
-=back
-
-
-
-=head1 SEE ALSO
-
-For all related information (bug reporting, mailing-list, pointers to
-MPD and POE, etc.), refer to L<POE::Component::Client::MPD>'s pod,
-section C<SEE ALSO>
-
+=back 
 
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin@cpan.org> >>
+  Jerome Quelin
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2007 by Jerome Quelin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut 
 
 
-=head1 COPYRIGHT & LICENSE
 
-Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
+__END__

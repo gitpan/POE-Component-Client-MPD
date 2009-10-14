@@ -1,17 +1,20 @@
-#
-# This file is part of POE::Component::Client::MPD.
-# Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-#
-#
-
-package POE::Component::Client::MPD::Collection;
-
+# 
+# This file is part of POE-Component-Client-MPD
+# 
+# This software is copyright (c) 2007 by Jerome Quelin.
+# 
+# This is free software; you can redistribute it and/or modify it under
+# the same terms as the Perl 5 programming language system itself.
+# 
 use 5.010;
 use strict;
 use warnings;
+
+package POE::Component::Client::MPD::Collection;
+our $VERSION = '0.9.4';
+
+
+# ABSTRACT: module handling collection commands
 
 use POE;
 use POE::Component::Client::MPD::Message;
@@ -288,13 +291,18 @@ sub _do_songs_with_title_partial {
 
 1;
 
-__END__
+
+
+
+=pod
 
 =head1 NAME
 
 POE::Component::Client::MPD::Collection - module handling collection commands
 
+=head1 VERSION
 
+version 0.9.4
 
 =head1 DESCRIPTION
 
@@ -311,15 +319,11 @@ module directly.
 Read L<POE::Component::Client::MPD>'s pod to learn how to deal with
 answers from those commands.
 
-
-
 =head1 PUBLIC EVENTS
 
 The following is a list of collection-related events accepted by POCOCM.
 
-
 =head2 Retrieving songs & directories
-
 
 =over 4
 
@@ -330,7 +334,6 @@ currently known by mpd.
 
 If C<$path> is supplied (relative to mpd root), restrict the retrieval to
 songs and dirs in this directory.
-
 
 =item * coll.all_items_simple( [$path] )
 
@@ -344,7 +347,6 @@ B</!\ Warning>: the L<Audio::MPD::Common::Item::Song> objects will only
 have their attribute file filled. Any other attribute will be empty, so
 don't use this sub for any other thing than a quick scan!
 
-
 =item * coll.items_in_dir( [$path] )
 
 Return the items in the given C<$path>. If no C<$path> supplied, do it on mpd's
@@ -352,13 +354,9 @@ root directory.
 
 Note that this sub does not work recusrively on all directories.
 
-
-=back
-
-
+=back 
 
 =head2 Retrieving the whole collection
-
 
 =over 4
 
@@ -366,29 +364,22 @@ Note that this sub does not work recusrively on all directories.
 
 Return the list of all albums (strings) currently known by mpd.
 
-
 =item * coll.all_artists()
 
 Return the list of all artists (strings) currently known by mpd.
 
-
 =item * coll.all_titles()
 
 Return the list of all titles (strings) currently known by mpd.
-
 
 =item * coll.all_files()
 
 Return a mpd_result event with the list of all filenames (strings)
 currently known by mpd.
 
-
-=back
-
-
+=back 
 
 =head2 Picking songs
-
 
 =over 4
 
@@ -397,19 +388,14 @@ currently known by mpd.
 Return the L<Audio::MPD::Common::Item::Song> which correspond to
 C<$path>.
 
-
 =item * coll.songs_with_filename_partial( $string )
 
 Return the L<Audio::MPD::Common::Item::Song>s containing C<$string> in
 their path.
 
-
-=back
-
-
+=back 
 
 =head2 Songs, albums & artists relations
-
 
 =over 4
 
@@ -418,63 +404,48 @@ their path.
 Return all albums (strings) performed by C<$artist> or where C<$artist>
 participated.
 
-
 =item * coll.songs_by_artist( $artist )
 
 Return all L<Audio::MPD::Common::Item::Song>s performed by C<$artist>.
-
 
 =item * coll.songs_by_artist_partial( $artist )
 
 Return all L<Audio::MPD::Common::Item::Song>s performed by C<$artist>.
 
-
 =item * coll.songs_from_album( $album )
 
 Return all L<Audio::MPD::Common::Item::Song>s appearing in C<$album>.
-
 
 =item * coll.songs_from_album_partial( $string )
 
 Return all L<Audio::MPD::Common::Item::Song>s appearing in album
 containing C<$string>.
 
-
 =item * coll.songs_with_title( $title )
 
 Return all L<Audio::MPD::Common::Item::Song>s which title is exactly
 C<$title>.
-
 
 =item * coll.songs_with_title_partial( $string )
 
 Return all L<Audio::MPD::Common::Item::Song>s where C<$string> is part
 of the title.
 
-
-=back
-
-
-
-=head1 SEE ALSO
-
-For all related information (bug reporting, mailing-list, pointers to
-MPD and POE, etc.), refer to L<POE::Component::Client::MPD>'s pod,
-section C<SEE ALSO>
-
-
+=back 
 
 =head1 AUTHOR
 
-Jerome Quelin, C<< <jquelin@cpan.org> >>
+  Jerome Quelin
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2007 by Jerome Quelin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut 
 
 
 
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) 2007-2008 Jerome Quelin, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
+__END__

@@ -1,54 +1,53 @@
 ---
-name: POE-Component-Client-MPD
-version: v0.9.3
+abstract: 'full-blown poe-aware mpd client library'
 author:
-  - 'Jerome Quelin <jquelin@cpan.org>'
-abstract: a full-blown mpd client library
+  - 'Jerome Quelin'
+generated_by: 'Dist::Zilla version 1.092680'
 license: perl
-resources:
-  license: http://dev.perl.org/licenses/
-build_requires:
-  Audio::MPD::Common: v0.1.4
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: POE-Component-Client-MPD
+provides:
+  POE::Component::Client::MPD:
+    file: lib/POE/Component/Client/MPD.pm
+    version: 0.9.4
+  POE::Component::Client::MPD::Collection:
+    file: lib/POE/Component/Client/MPD/Collection.pm
+    version: 0.9.4
+  POE::Component::Client::MPD::Commands:
+    file: lib/POE/Component/Client/MPD/Commands.pm
+    version: 0.9.4
+  POE::Component::Client::MPD::Connection:
+    file: lib/POE/Component/Client/MPD/Connection.pm
+    version: 0.9.4
+  POE::Component::Client::MPD::Message:
+    file: lib/POE/Component/Client/MPD/Message.pm
+    version: 0.9.4
+  POE::Component::Client::MPD::Playlist:
+    file: lib/POE/Component/Client/MPD/Playlist.pm
+    version: 0.9.4
+  POE::Component::Client::MPD::Test:
+    file: lib/POE/Component/Client/MPD/Test.pm
+    version: 0.9.4
+requires:
+  Audio::MPD::Common::Item: 0
+  Audio::MPD::Common::Stats: 0
+  Audio::MPD::Common::Status: 0
   Carp: 0
-  Class::Accessor::Fast: 0
-  Exporter: 0
+  English: 0
+  ExtUtils::MakeMaker: 0
+  File::Find: 0
   FindBin: 0
+  Module::Build: 0
   POE: 0
   POE::Component::Client::TCP: 0
   Readonly: 0
   Test::More: 0
+  base: 0
   perl: 5.010
-requires:
-  Audio::MPD::Common: v0.1.4
-  Carp: 0
-  Class::Accessor::Fast: 0
-  Exporter: 0
-  POE: 0
-  POE::Component::Client::TCP: 0
-  Readonly: 0
-  perl: 5.010
-recommends:
-  Test::Pod: 0
-  Test::Pod::Coverage: 0
-configure_requires:
-  Module::Build: 0.35
-provides:
-  POE::Component::Client::MPD:
-    file: lib/POE/Component/Client/MPD.pm
-    version: v0.9.3
-  POE::Component::Client::MPD::Collection:
-    file: lib/POE/Component/Client/MPD/Collection.pm
-  POE::Component::Client::MPD::Commands:
-    file: lib/POE/Component/Client/MPD/Commands.pm
-  POE::Component::Client::MPD::Connection:
-    file: lib/POE/Component/Client/MPD/Connection.pm
-  POE::Component::Client::MPD::Message:
-    file: lib/POE/Component/Client/MPD/Message.pm
-  POE::Component::Client::MPD::Playlist:
-    file: lib/POE/Component/Client/MPD/Playlist.pm
-  POE::Component::Client::MPD::Test:
-    file: lib/POE/Component/Client/MPD/Test.pm
-generated_by: Module::Build version 0.35
-meta-spec:
-  url: http://module-build.sourceforge.net/META-spec-v1.4.html
-  version: 1.4
+resources:
+  MailingList: http://groups.google.com/group/audio-mpd
+  homepage: http://search.cpan.org/dist/POE-Component-Client-MPD
+  repository: http://github.com/jquelin/poe-component-client-mpd
+version: 0.9.4
