@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Test;
-our $VERSION = '0.9.4';
+our $VERSION = '0.9.5';
 
 
 # ABSTRACT: automate launching of fake mdp for testing purposes
@@ -222,7 +222,7 @@ POE::Component::Client::MPD::Test - automate launching of fake mdp for testing p
 
 =head1 VERSION
 
-version 0.9.4
+version 0.9.5
 
 =head1 SYNOPSIS
 

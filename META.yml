@@ -11,35 +11,34 @@ name: POE-Component-Client-MPD
 provides:
   POE::Component::Client::MPD:
     file: lib/POE/Component/Client/MPD.pm
-    version: 0.9.4
+    version: 0.9.5
   POE::Component::Client::MPD::Collection:
     file: lib/POE/Component/Client/MPD/Collection.pm
-    version: 0.9.4
+    version: 0.9.5
   POE::Component::Client::MPD::Commands:
     file: lib/POE/Component/Client/MPD/Commands.pm
-    version: 0.9.4
+    version: 0.9.5
   POE::Component::Client::MPD::Connection:
     file: lib/POE/Component/Client/MPD/Connection.pm
-    version: 0.9.4
+    version: 0.9.5
   POE::Component::Client::MPD::Message:
     file: lib/POE/Component/Client/MPD/Message.pm
-    version: 0.9.4
+    version: 0.9.5
   POE::Component::Client::MPD::Playlist:
     file: lib/POE/Component/Client/MPD/Playlist.pm
-    version: 0.9.4
+    version: 0.9.5
   POE::Component::Client::MPD::Test:
     file: lib/POE/Component/Client/MPD/Test.pm
-    version: 0.9.4
+    version: 0.9.5
 requires:
   Audio::MPD::Common::Item: 0
   Audio::MPD::Common::Stats: 0
   Audio::MPD::Common::Status: 0
   Carp: 0
+  Class::Accessor::Fast: 0
   English: 0
-  ExtUtils::MakeMaker: 0
   File::Find: 0
   FindBin: 0
-  Module::Build: 0
   POE: 0
   POE::Component::Client::TCP: 0
   Readonly: 0
@@ -50,4 +49,4 @@ resources:
   MailingList: http://groups.google.com/group/audio-mpd
   homepage: http://search.cpan.org/dist/POE-Component-Client-MPD
   repository: http://github.com/jquelin/poe-component-client-mpd
-version: 0.9.4
+version: 0.9.5

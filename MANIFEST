@@ -35,7 +35,6 @@ t/61-coll-whole.t
 t/62-coll-pick.t
 t/63-coll-relations.t
 t/author-critic.t
-t/mpd-test/mpd.conf
 t/mpd-test/mpd.conf.template
 t/mpd-test/music/dir1/title-artist-album.ogg
 t/mpd-test/music/dir1/title-artist.ogg

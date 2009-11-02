@@ -18,22 +18,21 @@ my @modules;
 find(
   sub {
     return if $File::Find::name !~ /\.pm\z/;
-    my $found = $File::Find::name;
-    $found =~ s{^lib/}{};
-    $found =~ s{[/\\]}{::}g;
-    $found =~ s/\.pm$//;
-    return if $found =~ /Test$/;
-    push @modules, $found;
+    push @modules, $File::Find::name;
   },
   'lib',
 );
-
 my @scripts = glob "bin/*";
 
 plan tests => scalar(@modules) + scalar(@scripts);
     
-is( qx{ $^X -Ilib -M$_ -e "print '$_ ok'" }, "$_ ok", "$_ loaded ok" )
-    for sort @modules;
+foreach my $file ( @modules ) {
+    my $module = $file;
+    $module =~ s{^lib/}{};
+    $module =~ s{[/\\]}{::}g;
+    $module =~ s/\.pm$//;
+    is( qx{ $^X -Ilib -M$module -e "print '$module ok'" }, "$module ok", "$module loaded ok" );
+}
     
 SKIP: {
     eval "use Test::Script; 1;";

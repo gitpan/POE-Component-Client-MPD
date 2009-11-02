@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Connection;
-our $VERSION = '0.9.4';
+our $VERSION = '0.9.5';
 
 
 # ABSTRACT: module handling the tcp connection with mpd
@@ -348,7 +348,7 @@ POE::Component::Client::MPD::Connection - module handling the tcp connection wit
 
 =head1 VERSION
 
-version 0.9.4
+version 0.9.5
 
 =head1 DESCRIPTION
 
