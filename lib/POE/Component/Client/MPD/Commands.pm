@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Commands;
-our $VERSION = '0.9.5';
+our $VERSION = '0.9.6';
 
 
 # ABSTRACT: module handling basic mpd commands
@@ -475,7 +475,7 @@ POE::Component::Client::MPD::Commands - module handling basic mpd commands
 
 =head1 VERSION
 
-version 0.9.5
+version 0.9.6
 
 =head1 DESCRIPTION
 

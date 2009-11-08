@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD;
-our $VERSION = '0.9.5';
+our $VERSION = '0.9.6';
 
 
 # ABSTRACT: full-blown poe-aware mpd client library
@@ -333,7 +333,7 @@ POE::Component::Client::MPD - full-blown poe-aware mpd client library
 
 =head1 VERSION
 
-version 0.9.5
+version 0.9.6
 
 =begin FIXME
 

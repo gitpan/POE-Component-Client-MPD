@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Playlist;
-our $VERSION = '0.9.5';
+our $VERSION = '0.9.6';
 
 
 # ABSTRACT: module handling playlist commands
@@ -304,7 +304,7 @@ POE::Component::Client::MPD::Playlist - module handling playlist commands
 
 =head1 VERSION
 
-version 0.9.5
+version 0.9.6
 
 =head1 DESCRIPTION
 
