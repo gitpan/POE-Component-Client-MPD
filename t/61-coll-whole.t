@@ -8,13 +8,25 @@
 # the same terms as the Perl 5 programming language system itself.
 # 
 
+use 5.010;
 use strict;
 use warnings;
 
+use POE;
+use POE::Component::Client::MPD;
+use POE::Component::Client::MPD::Test;
 use Test::More;
 
-my $nbtests = 12;
-my @tests   = (
+# are we able to test module?
+eval 'use Test::Corpus::Audio::MPD';
+plan skip_all => $@ if $@ =~ s/\n+Compilation failed.*//s;
+plan tests => 12;
+
+# launch fake mpd
+POE::Component::Client::MPD->spawn;
+
+# launch the tests
+POE::Component::Client::MPD::Test->new( { tests => [
     # [ 'event', [ $arg1, $arg2, ... ], $sleep, \&check_results ]
 
     # all_albums
@@ -28,13 +40,8 @@ my @tests   = (
 
     # all_files
     [ 'coll.all_files',   [], 0, \&check_all_files   ],
-
-);
-
-
-# are we able to test module?
-eval 'use POE::Component::Client::MPD::Test nbtests=>$nbtests, tests=>\@tests';
-diag($@), plan skip_all => $@ if $@ =~ s/\n+BEGIN failed--compilation aborted.*//s;
+] } );
+POE::Kernel->run;
 exit;
 
 #--

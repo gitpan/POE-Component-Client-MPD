@@ -8,14 +8,26 @@
 # the same terms as the Perl 5 programming language system itself.
 # 
 
+use 5.010;
 use strict;
 use warnings;
 
+use POE;
+use POE::Component::Client::MPD;
+use POE::Component::Client::MPD::Test;
 use Test::More;
 
+# are we able to test module?
+eval 'use Test::Corpus::Audio::MPD';
+plan skip_all=>$@ if $@ =~ s/\n+BEGIN failed--compilation aborted.*//s;
+plan tests => 20;
+
+# launch fake mpd
+POE::Component::Client::MPD->spawn;
+
+# launch the tests
 my @songs   = qw{ title.ogg dir1/title-artist-album.ogg dir1/title-artist.ogg };
-my $nbtests = 20;
-my @tests   = (
+POE::Component::Client::MPD::Test->new( { tests => [
     # [ 'event', [ $arg1, $arg2, ... ], $sleep, \&check_results ]
 
     # volume
@@ -40,11 +52,8 @@ my @tests   = (
     [ 'play',           [],      0, \&check_success        ],
     [ 'pause',          [],      0, \&check_success        ],
     [ 'status',         [],      0, \&check_output_enable  ],
-);
-
-# are we able to test module?
-eval 'use POE::Component::Client::MPD::Test nbtests=>$nbtests, tests=>\@tests';
-diag($@), plan skip_all => $@ if $@ =~ s/\n+BEGIN failed--compilation aborted.*//s;
+] } );
+POE::Kernel->run;
 exit;
 
 #--
@@ -75,8 +84,8 @@ sub check_volume_relative_neg {
 sub check_output_disable {
     my ($msg, $status) = @_;
     check_success($msg);
-    TODO: {
-        local $TODO = "detection method doesn't always work - depends on timing";
+    SKIP: {
+        skip "detection method doesn't always work - depends on timing", 1;
         like($status->error, qr/^problems/, 'disabling output' );
     }
 }

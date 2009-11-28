@@ -11,60 +11,53 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Playlist;
-our $VERSION = '0.9.6';
+our $VERSION = '1.093320';
 
 
 # ABSTRACT: module handling playlist commands
 
+use Moose;
+use MooseX::Has::Sugar;
 use POE;
+use Readonly;
+
 use POE::Component::Client::MPD::Message;
 
-use base qw{ Class::Accessor::Fast };
+
+# -- attributes
+
+has mpd => ( ro, required, weak_ref, );# isa=>'POE::Component::Client::MPD' );
 
 
 # -- Playlist: retrieving information
 
-#
-# event: pl.as_items()
-#
-# Return an array of L<Audio::MPD::Common::Item::Song>s, one for each of
-# the songs in the current playlist.
-#
-sub _do_as_items {
-    my ($self, $k, $h, $msg) = @_;
 
-    $msg->_commands ( [ 'playlistinfo' ] );
-    $msg->_cooking  ( $AS_ITEMS );
-    $k->post( $h->{socket}, 'send', $msg );
+sub _do_as_items {
+    my ($self, $msg) = @_;
+
+    $msg->_set_commands ( [ 'playlistinfo' ] );
+    $msg->_set_cooking  ( 'as_items' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.items_changed_since( $plversion )
-#
-# Return a list with all the songs (as Audio::MPD::Common::Item::Song
-# objects) added to the playlist since playlist $plversion.
-#
+
 sub _do_items_changed_since {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $plid = $msg->params->[0];
 
-    $msg->_commands ( [ "plchanges $plid" ] );
-    $msg->_cooking  ( $AS_ITEMS );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ "plchanges $plid" ] );
+    $msg->_set_cooking  ( 'as_items' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 # -- Playlist: adding / removing songs
 
-#
-# event: pl.add( $path, $path, ... )
-#
-# Add the songs identified by $path (relative to MPD's music directory) to
-# the current playlist.
-#
+
+
 sub _do_add {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my $args   = $msg->params;
     my @pathes = @$args;         # args of the poe event
@@ -73,19 +66,15 @@ sub _do_add {
         map( qq{add "$_"}, @pathes ),
         'command_list_end',
     );
-    $msg->_commands ( \@commands );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( \@commands );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.delete( $number, $number, ... )
-#
-# Remove song $number (starting from 0) from the current playlist.
-#
+
 sub _do_delete {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my $args    = $msg->params;
     my @numbers = @$args;
@@ -94,20 +83,15 @@ sub _do_delete {
         map( qq{delete $_}, reverse sort {$a<=>$b} @numbers ),
         'command_list_end',
     );
-    $msg->_commands ( \@commands );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( \@commands );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.deleteid( $songid, $songid, ... )
-#
-# Remove the specified $songid (as assigned by mpd when inserted in playlist)
-# from the current playlist.
-#
+
 sub _do_deleteid {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my $args    = $msg->params;
     my @songids = @$args;
@@ -116,38 +100,30 @@ sub _do_deleteid {
         map( qq{deleteid $_}, @songids ),
         'command_list_end',
     );
-    $msg->_commands ( \@commands );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( \@commands );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: clear()
-#
-# Remove all the songs from the current playlist.
-#
+
 sub _do_clear {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'clear' ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'clear' ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: crop()
-#
-#  Remove all of the songs from the current playlist *except* the current one.
-#
+
 sub _do_crop {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     if ( not defined $msg->_data ) {
         # no status yet - fire an event
-        $msg->_post( 'pl.crop' );
-        $h->{mpd}->_dispatch($k, $h, 'status', $msg);
+        $msg->_set_post( 'pl.crop' );
+        $self->mpd->_dispatch('status', $msg);
         return;
     }
 
@@ -160,140 +136,108 @@ sub _do_crop {
         'command_list_end'
     );
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( \@commands );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( \@commands );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 # -- Playlist: changing playlist order
 
-#
-# event: pl.shuffle()
-#
-# Shuffle the current playlist.
-#
+
+
 sub _do_shuffle {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ 'shuffle' ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ 'shuffle' ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.swap( $song1, $song2 )
-#
-# Swap positions of song number $song1 and $song2 in the current playlist.
-#
+
 sub _do_swap {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my ($from, $to) = @{ $msg->params }[0,1];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ "swap $from $to" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ "swap $from $to" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.swapid( $songid1, $songid2 )
-#
-# Swap positions of song id $songid1 and $songid2 in the current playlist.
-#
+
 sub _do_swapid {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my ($from, $to) = @{ $msg->params }[0,1];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ "swapid $from $to" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ "swapid $from $to" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.move( $song, $newpos )
-#
-# Move song number $song to the position $newpos.
-#
+
 sub _do_move {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my ($song, $pos) = @{ $msg->params }[0,1];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ "move $song $pos" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ "move $song $pos" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.moveid( $songid, $newpos )
-#
-# Move song id $songid to the position $newpos.
-#
+
 sub _do_moveid {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my ($songid, $pos) = @{ $msg->params }[0,1];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ "moveid $songid $pos" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ "moveid $songid $pos" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 # -- Playlist: managing playlists
 
-#
-# event: pl.load( $playlist )
-#
-# Load list of songs from specified $playlist file.
-#
+
+
 sub _do_load {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $playlist = $msg->params->[0];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ qq{load "$playlist"} ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ qq{load "$playlist"} ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.save( $playlist )
-#
-# Save the current playlist to a file called $playlist in MPD's
-# playlist directory.
-#
+
 sub _do_save {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $playlist = $msg->params->[0];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ qq{save "$playlist"} ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ qq{save "$playlist"} ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pl.rm( $playlist )
-#
-# Delete playlist named $playlist from MPD's playlist directory.
-#
+
 sub _do_rm {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $playlist = $msg->params->[0];
 
-    $msg->_cooking  ( $RAW );
-    $msg->_commands ( [ qq{rm "$playlist"} ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking  ( 'raw' );
+    $msg->_set_commands ( [ qq{rm "$playlist"} ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-
+no Moose;
+__PACKAGE__->meta->make_immutable;
 1;
-
-
 
 
 =pod
@@ -304,7 +248,7 @@ POE::Component::Client::MPD::Playlist - module handling playlist commands
 
 =head1 VERSION
 
-version 0.9.6
+version 1.093320
 
 =head1 DESCRIPTION
 
@@ -317,102 +261,85 @@ session you created: it will be responsible for dispatching the event
 where it is needed. Under no circumstance should you call directly subs
 or methods from this module directly.
 
-Read POCOCM's pod to learn how to deal with answers from those commands.
+Read L<POCOCM|POE::Component::Client::MPD>'s pod to learn how to deal
+with answers from those commands.
 
-=head1 PUBLIC EVENTS
+Following is a list of playlist-related events accepted by POCOCM.
 
-The following is a list of playlist-related events accepted by POCOCM.
+=head1 RETRIEVING INFORMATION
 
-=head2 Retrieving information
-
-=over 4
-
-=item * pl.as_items()
+=head2 pl.as_items( )
 
 Return an array of L<Audio::MPD::Common::Item::Song>s, one for each of
 the songs in the current playlist.
 
-=item * pl.items_changed_since( $plversion )
+=head2 pl.items_changed_since( $plversion )
 
 Return a list with all the songs (as L<Audio::MPD::Common::Item::Song>
 objects) added to the playlist since playlist C<$plversion>.
 
-=back 
+=head1 ADDING / REMOVING SONGS
 
-=head2 Adding / removing songs
-
-=over 4
-
-=item * pl.add( $path, $path, ... )
+=head2 pl.add( $path, $path, ... )
 
 Add the songs identified by C<$path> (relative to MPD's music directory)
 to the current playlist.
 
-=item * pl.delete( $number, $number, ... )
+=head2 pl.delete( $number, $number, ... )
 
 Remove song C<$number> (starting from 0) from the current playlist.
 
-=item * pl.deleteid( $songid, $songid, ... )
+=head2 pl.deleteid( $songid, $songid, ... )
 
 Remove the specified C<$songid> (as assigned by mpd when inserted in
 playlist) from the current playlist.
 
-=item * clear()
+=head2 clear( )
 
 Remove all the songs from the current playlist.
 
-=item * crop()
+=head2 crop( )
 
 Remove all of the songs from the current playlist *except* the current one.
 
-=back 
+=head1 CHANGING PLAYLIST ORDER
 
-=head2 Changing playlist order
-
-=over 4
-
-=item * pl.shuffle()
+=head2 pl.shuffle( )
 
 Shuffle the current playlist.
 
-=item * pl.swap( $song1, $song2 )
+=head2 pl.swap( $song1, $song2 )
 
 Swap positions of song number C<$song1> and C<$song2> in the current
 playlist.
 
-=item * pl.swapid( $songid1, $songid2 )
+=head2 pl.swapid( $songid1, $songid2 )
 
 Swap positions of song id C<$songid1> and C<$songid2> in the current
 playlist.
 
-=item * pl.move( $song, $newpos )
+=head2 pl.move( $song, $newpos )
 
 Move song number C<$song> to the position C<$newpos>.
 
-=item * pl.moveid( $songid, $newpos )
+=head2 pl.moveid( $songid, $newpos )
 
 Move song id C<$songid> to the position C<$newpos>.
 
-=back 
+=head1 MANAGING PLAYLISTS
 
-=head2 Managing playlists
-
-=over 4
-
-=item * pl.load( $playlist )
+=head2 pl.load( $playlist )
 
 Load list of songs from specified C<$playlist> file.
 
-=item * pl.save( $playlist )
+=head2 pl.save( $playlist )
 
 Save the current playlist to a file called C<$playlist> in MPD's
 playlist directory.
 
-=item * pl.rm( $playlist )
+=head2 pl.rm( $playlist )
 
 Delete playlist named C<$playlist> from MPD's playlist directory.
-
-=back 
 
 =head1 AUTHOR
 
@@ -425,8 +352,7 @@ This software is copyright (c) 2007 by Jerome Quelin.
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
-=cut 
-
+=cut
 
 
 __END__

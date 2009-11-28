@@ -11,42 +11,26 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Connection;
-our $VERSION = '0.9.6';
+our $VERSION = '1.093320';
 
 
 # ABSTRACT: module handling the tcp connection with mpd
 
 use Audio::MPD::Common::Item;
 use POE;
-use POE::Component::Client::MPD::Message; # for exported constants
 use POE::Component::Client::TCP;
 use Readonly;
 
+use POE::Component::Client::MPD::Message; # for exported constants
 
-#--
-# CLASS METHODS
-#
+
+# -- attributes
+
+
 
 # -- public methods
 
-#
-# my $id = POE::Component::Client::MPD::Connection->spawn(\%params);
-#
-# This method will create a POE::Component::TCP session responsible for
-# low-level communication with mpd. It will return the poe id of the
-# session newly created.
-#
-# Arguments are passed as a hash reference, with the keys:
-#   - host:        hostname of the mpd server.
-#   - port:        port of the mpd server.
-#   - id:          poe session id of the peer to dialog with.
-#   - max_retries: number of retries before giving up. defaults to 5.
-#   - retry_wait:  time to wait before attempting to reconnect. defaults to 2.
-#
-# The args without default are not supposed to be empty - ie, you will
-# get an error if you don't follow this requirement! Yes, this is a
-# private class, and you're not supposed to use it beyond pococm. :-)
-#
+
 sub spawn {
     my ($type, $args) = @_;
 
@@ -56,29 +40,159 @@ sub spawn {
         RemotePort    => $args->{port},
         Filter        => 'POE::Filter::Line',
         Args          => [ $args ],
-
+        Alias         => '_mpd_conn',
 
         ServerError  => sub { }, # quiet errors
-        Started      => \&_onpriv_Started,
-        Connected    => \&_onpriv_Connected,
-        ConnectError => \&_onpriv_ConnectError,
-        Disconnected => \&_onpriv_Disconnected,
-        ServerInput  => \&_onpriv_ServerInput,
+        Started      => \&_Started,
+        Connected    => \&_Connected,
+        ConnectError => \&_ConnectError,
+        Disconnected => \&_Disconnected,
+        ServerInput  => \&_ServerInput,
 
         InlineStates => {
-            # protected events
-            send       => \&_onprot_send,         # send data
-            disconnect => \&_onprot_disconnect,   # force quit
-        }
+            send       => \&send,         # send data
+            disconnect => \&disconnect,   # force quit
+        },
     );
 
     return $id;
 }
 
 
-#--
-# SUBS
+
+# -- public events
+
+
+sub disconnect {
+    $_[HEAP]->{auto_reconnect} = 0;    # no more auto-reconnect.
+    $_[KERNEL]->yield( 'shutdown' );   # shutdown socket.
+}
+
+
+
+sub send {
+    my ($h, $msg) = @_[HEAP, ARG0];
+    # $_[HEAP]->{server} is a reserved slot of pococ-tcp.
+    # note: calls to $h->{server}->put can fail with "no such method
+    #       put". this happens when trying to send data over wires
+    #       before having received the Connected event
+    # FIXME: really implement some offline mode
+    $h->{server}->put( @{ $msg->_commands } );
+    push @{ $h->{fifo} }, $msg;
+}
+
+
+# -- private events
+
 #
+# event: Started($id)
+#
+# Called whenever the session is started, but before the tcp connection is
+# established. Receives the session $id of the poe-session that will be our
+# peer during the life of this session.
+#
+sub _Started {
+    my ($h, $args) = @_[HEAP, ARG0];
+
+    # storing params
+    $h->{session}     = $args->{id};                # poe-session peer
+    $h->{max_retries} = $args->{max_retries} // 5;  # max retries before giving up
+    $h->{retry_wait}  = $args->{retry_wait}  // 2;  # sleep time before retry
+
+    # setting session vars
+    $h->{auto_reconnect} = 1;                   # on-disconnect policy
+    $h->{retries_left}   = $h->{max_retries};   # how much chances is there still?
+}
+
+
+#
+# event: Connected()
+#
+# Called whenever the tcp connection is established.
+#
+sub _Connected {
+    my $h = $_[HEAP];
+    $h->{fifo}         = [];                 # reset current messages
+    $h->{incoming}     = [];                 # reset incoming data
+    $h->{is_mpd}       = 0;                  # is remote server a mpd sever?
+    $h->{retries_left} = $h->{max_retries};  # reset connection retries count
+}
+
+
+#
+# event: ConnectError($syscall, $errno, $errstr)
+#
+# Called whenever the tcp connection fails to be established. Generally
+# due to mpd server not started, or wrong host / port, etc. Receives
+# the $syscall that failed, as well as $errno and $errstr.
+#
+sub _ConnectError {
+    my ($k, $h, $syscall, $errno, $errstr) = @_[KERNEL, HEAP, ARG0, ARG1, ARG2];
+    return unless $h->{auto_reconnect};
+
+    # check if this is the last allowed error.
+    $h->{retries_left}--;
+    my ($event, $msg);
+    if ( $h->{retries_left} > 0 ) {
+        # nope, we can reconnect
+        $event = 'mpd_connect_error_retriable';
+        $msg   = '';
+
+        # auto-reconnect in $retry_wait seconds
+        $k->delay_add('reconnect' => $h->{retry_wait});
+
+    } else {
+        # yup, it was our last chance.
+        $event = 'mpd_connect_error_fatal';
+        $msg   = 'Too many failed attempts! error was: ';
+    }
+
+    # signal that there was a problem during connection
+    my $error = $msg . "$syscall: ($errno) $errstr";
+    $k->post( $h->{session}, $event, $error );
+}
+
+
+#
+# event: Disconnected()
+#
+# Called whenever the tcp connection is broken / finished.
+#
+sub _Disconnected {
+    my ($k, $h) = @_[KERNEL, HEAP];
+
+    # signal that we're disconnected
+    $k->post($h->{session}, 'mpd_disconnected');
+
+    # auto-reconnect in $retry_wait seconds
+    return unless $h->{auto_reconnect};
+    $k->delay_add('reconnect' => $h->{retry_wait});
+}
+
+
+#
+# event: ServerInput($input)
+#
+# Called whenever the tcp peer sends data over the wires, with the $input
+# transmitted given as param.
+#
+sub _ServerInput {
+    my ($k, $h, $input) = @_[KERNEL, HEAP, ARG0];
+
+    # did we check we were talking to a mpd server?
+    if ( not $h->{is_mpd} ) {
+        _got_first_input_line($k, $h, $input);
+        return;
+    }
+
+    # table of dispatch: check input against regex, and process it.
+    given ($input) {
+        when ( /^OK$/ )      { _got_data_eot($k, $h);     }
+        when ( /^ACK (.*)/ ) { _got_error($k, $h, $1);    }
+        default              { _got_data($k, $h, $input); }
+    }
+}
+
 
 # -- private subs
 
@@ -94,12 +208,12 @@ sub _got_data {
     my $msg = $h->{fifo}[0];
 
     given ($msg->_cooking) {
-        when ($RAW) {
+        when ('raw') {
             # nothing to do, just push the data.
             push @{ $h->{incoming} }, $input;
         }
 
-        when ($AS_ITEMS) {
+        when ('as_items') {
             # Lots of POCOCM methods are sending commands and then parse the
             # output to build an amc-item.
             my ($k,$v) = split /:\s+/, $input, 2;
@@ -116,7 +230,7 @@ sub _got_data {
             $h->{incoming}[-1]->$k($v);
         }
 
-        when ($AS_KV) {
+        when ('as_kv') {
             # Lots of POCOCM methods are sending commands and then parse the
             # output to get a list of key / value (with the colon ":" acting
             # as separator).
@@ -124,7 +238,7 @@ sub _got_data {
             push @{ $h->{incoming} }, @data;
         }
 
-        when ($STRIP_FIRST) {
+        when ('strip_first') {
             # Lots of POCOCM methods are sending commands and then parse the
             # output to remove the first field (with the colon ":" acting as
             # separator).
@@ -145,8 +259,8 @@ sub _got_data_eot {
     my ($k, $h) = @_;
     my $session = $h->{session};
     my $msg     = shift @{ $h->{fifo} };     # remove completed msg
-    $msg->_data($h->{incoming});             # complete message with data
-    $msg->status(1);                         # success
+    $msg->_set_data($h->{incoming});         # complete message with data
+    $msg->set_status(1);                     # success
     $k->post($session, 'mpd_data', $msg);    # signal poe session
     $h->{incoming} = [];                     # reset incoming data
 }
@@ -189,155 +303,7 @@ sub _got_first_input_line {
 }
 
 
-
-#--
-# EVENTS HANDLERS
-#
-
-# -- protected events
-
-#
-# event: disconnect()
-#
-# Request the pococm-connection to be shutdown. No argument.
-#
-sub _onprot_disconnect {
-    $_[HEAP]->{auto_reconnect} = 0;    # no more auto-reconnect.
-    $_[KERNEL]->yield( 'shutdown' );   # shutdown socket.
-}
-
-
-#
-# event: send($message)
-#
-# Request pococm-conn to send the commands of $message over the wires.
-# Note that $message is a pococm-message object, and that the ->_commands
-# should *not* be newline terminated.
-#
-sub _onprot_send {
-    my ($h, $msg) = @_[HEAP, ARG0];
-    # $_[HEAP]->{server} is a reserved slot of pococ-tcp.
-    $h->{server}->put( @{ $msg->_commands } );
-    push @{ $h->{fifo} }, $msg;
-}
-
-
-# -- private events
-
-#
-# event: Started($id)
-#
-# Called whenever the session is started, but before the tcp connection is
-# established. Receives the session $id of the poe-session that will be our
-# peer during the life of this session.
-#
-sub _onpriv_Started {
-    my ($h, $args) = @_[HEAP, ARG0];
-
-    # storing params
-    $h->{session}     = $args->{id};                # poe-session peer
-    $h->{max_retries} = $args->{max_retries} // 5;  # max retries before giving up
-    $h->{retry_wait}  = $args->{retry_wait}  // 2;  # sleep time before retry
-
-    # setting session vars
-    $h->{auto_reconnect} = 1;                   # on-disconnect policy
-    $h->{retries_left}   = $h->{max_retries};   # how much chances is there still?
-}
-
-
-#
-# event: Connected()
-#
-# Called whenever the tcp connection is established.
-#
-sub _onpriv_Connected {
-    my $h = $_[HEAP];
-    $h->{fifo}         = [];                 # reset current messages
-    $h->{incoming}     = [];                 # reset incoming data
-    $h->{is_mpd}       = 0;                  # is remote server a mpd sever?
-    $h->{retries_left} = $h->{max_retries};  # reset connection retries count
-}
-
-
-#
-# event: ConnectError($syscall, $errno, $errstr)
-#
-# Called whenever the tcp connection fails to be established. Generally
-# due to mpd server not started, or wrong host / port, etc. Receives
-# the $syscall that failed, as well as $errno and $errstr.
-#
-sub _onpriv_ConnectError {
-    my ($k, $h, $syscall, $errno, $errstr) = @_[KERNEL, HEAP, ARG0, ARG1, ARG2];
-    return unless $h->{auto_reconnect};
-
-    # check if this is the last allowed error.
-    $h->{retries_left}--;
-    my ($event, $msg);
-    if ( $h->{retries_left} > 0 ) {
-        # nope, we can reconnect
-        $event = 'mpd_connect_error_retriable';
-        $msg   = '';
-
-        # auto-reconnect in $retry_wait seconds
-        $k->delay_add('reconnect' => $h->{retry_wait});
-
-    } else {
-        # yup, it was our last chance.
-        $event = 'mpd_connect_error_fatal';
-        $msg   = 'Too many failed attempts! error was: ';
-    }
-
-    # signal that there was a problem during connection
-    my $error = $msg . "$syscall: ($errno) $errstr";
-    $k->post( $h->{session}, $event, $error );
-}
-
-
-#
-# event: Disconnected()
-#
-# Called whenever the tcp connection is broken / finished.
-#
-sub _onpriv_Disconnected {
-    my ($k, $h) = @_[KERNEL, HEAP];
-
-    # signal that we're disconnected
-    $k->post($h->{session}, 'mpd_disconnected');
-
-    # auto-reconnect in $retry_wait seconds
-    return unless $h->{auto_reconnect};
-    $k->delay_add('reconnect' => $h->{retry_wait});
-}
-
-
-#
-# event: ServerInput($input)
-#
-# Called whenever the tcp peer sends data over the wires, with the $input
-# transmitted given as param.
-#
-sub _onpriv_ServerInput {
-    my ($k, $h, $input) = @_[KERNEL, HEAP, ARG0];
-
-    # did we check we were talking to a mpd server?
-    if ( not $h->{is_mpd} ) {
-        _got_first_input_line($k, $h, $input);
-        return;
-    }
-
-    # table of dispatch: check input against regex, and process it.
-    given ($input) {
-        when ( /^OK$/ )      { _got_data_eot($k, $h);     }
-        when ( /^ACK (.*)/ ) { _got_error($k, $h, $1);    }
-        default              { _got_data($k, $h, $input); }
-    }
-}
-
-
-
 1;
-
-
 
 
 =pod
@@ -348,64 +314,53 @@ POE::Component::Client::MPD::Connection - module handling the tcp connection wit
 
 =head1 VERSION
 
-version 0.9.6
+version 1.093320
 
 =head1 DESCRIPTION
 
-This module will spawn a poe session responsible for low-level communication
-with mpd. It is written as a pococ-tcp, which is taking care of everything
-needed.
+This module will spawn a poe session responsible for low-level
+communication with mpd. It is written as a
+L<POE::Component::Client::TCP>, which is taking care of
+everything needed.
 
-Note that you're B<not> supposed to use this class directly: it's one of the
-helper class for POCOCM.
+Note that you're B<not> supposed to use this class directly: it's one of
+the helper class for L<POE::Component::Client::MPD>.
 
-=head1 PUBLIC METHODS
+=head1 ATTRIBUTES
 
-=head2 spawn( \%params )
-
-This method will create a POE::Component::TCP session responsible for low-level
-communication with mpd.
-
-It will return the poe id of the session newly created.
-
-You should provide some arguments as a hash reference, where the hash keys are:
-
-=over 4
-
-=item * host
+=head2 host
 
 The hostname of the mpd server. Mandatory, no default.
 
-=item * port
+=head2 port
 
 The port of the mpd server. Mandatory, no default.
 
-=item * id
+=head2 id
 
 The POE session id of the peer to dialog with. Mandatory, no default.
 
-=item * max_retries
+=head2 max_retries
 
 How much time to attempt reconnection before giving up. Defaults to 5.
 
-=item * retry_wait
+=head2 retry_wait
 
 How much time to wait (in seconds) before attempting socket
 reconnection. Defaults to 2.
 
-=back 
+=head1 METHODS
 
-The args without default are not supposed to be empty - ie, you will get
-an error if you don't follow those requirements! Yes, this is a private
-class, and you're not supposed to use it beyond pococm. :-)
+=head2 my $id = POE::Component::Client::MPD::Connection->spawn( \%params );
+
+This method will create a L<POE::Component::Client::TCP> session
+responsible for low-level communication with mpd.
+
+It will return the poe id of the session newly created.
 
 =head1 PUBLIC EVENTS ACCEPTED
 
-The following events are accepted from outside this class - but of course
-restricted to POCOCM (in oo-lingo, they are more protected rather than
-public).
-
-=head2 disconnect()
+=head2 disconnect( )
 
 Request the pococm-connection to be shutdown. This does B<not> shut down
 the MPD server. No argument.
@@ -413,8 +368,9 @@ the MPD server. No argument.
 =head2 send( $message )
 
 Request pococm-conn to send the C<$message> over the wires. Note that
-this request is a pococm-message object properly filled up, and that the
-C<_commands()> attribute should B<not> be newline terminated.
+this request is a L<POE::Component::Client::MPD::Message> object
+properly filled up, and that the C<_commands()> attribute should B<not>
+be newline terminated.
 
 =head1 PUBLIC EVENTS FIRED
 
@@ -447,7 +403,7 @@ Fired when C<$msg> has been sent over the wires, and mpd server has
 answered with success. The actual output should be looked up in
 C<$msg->_data>.
 
-=head2 mpd_disconnected()
+=head2 mpd_disconnected( )
 
 Fired when the socket has been disconnected for whatever reason. Note
 that this event is B<not> fired in the case of a programmed shutdown
@@ -470,8 +426,7 @@ This software is copyright (c) 2007 by Jerome Quelin.
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
-=cut 
-
+=cut
 
 
 __END__

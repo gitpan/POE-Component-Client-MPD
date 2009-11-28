@@ -2,7 +2,11 @@
 abstract: 'full-blown poe-aware mpd client library'
 author:
   - 'Jerome Quelin'
-generated_by: 'Dist::Zilla version 1.093000'
+build_requires:
+  Module::Build: 0.35
+configure_requires:
+  Module::Build: 0.35
+generated_by: 'Dist::Zilla version 1.093250'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -11,44 +15,53 @@ name: POE-Component-Client-MPD
 provides:
   POE::Component::Client::MPD:
     file: lib/POE/Component/Client/MPD.pm
-    version: 0.9.6
+    version: 1.093320
   POE::Component::Client::MPD::Collection:
     file: lib/POE/Component/Client/MPD/Collection.pm
-    version: 0.9.6
+    version: 1.093320
   POE::Component::Client::MPD::Commands:
     file: lib/POE/Component/Client/MPD/Commands.pm
-    version: 0.9.6
+    version: 1.093320
   POE::Component::Client::MPD::Connection:
     file: lib/POE/Component/Client/MPD/Connection.pm
-    version: 0.9.6
+    version: 1.093320
   POE::Component::Client::MPD::Message:
     file: lib/POE/Component/Client/MPD/Message.pm
-    version: 0.9.6
+    version: 1.093320
   POE::Component::Client::MPD::Playlist:
     file: lib/POE/Component/Client/MPD/Playlist.pm
-    version: 0.9.6
+    version: 1.093320
   POE::Component::Client::MPD::Test:
     file: lib/POE/Component/Client/MPD/Test.pm
-    version: 0.9.6
+    version: 1.093320
+  POE::Component::Client::MPD::Types:
+    file: lib/POE/Component/Client/MPD/Types.pm
+    version: 1.093320
 requires:
   Audio::MPD::Common::Item: 0
   Audio::MPD::Common::Stats: 0
   Audio::MPD::Common::Status: 0
   Carp: 0
-  Class::Accessor::Fast: 0
   English: 0
   ExtUtils::MakeMaker: 0
   File::Find: 0
   FindBin: 0
   Module::Build: 0
+  Moose: 0.92
+  Moose::Util::TypeConstraints: 0
+  MooseX::Aliases: 0
+  MooseX::Has::Sugar: 0
+  MooseX::POE: 0
+  MooseX::SemiAffordanceAccessor: 0
+  MooseX::Types::Moose: 0
   POE: 0
   POE::Component::Client::TCP: 0
   Readonly: 0
+  Sub::Exporter: 0
   Test::More: 0
-  base: 0
   perl: 5.010
 resources:
   MailingList: http://groups.google.com/group/audio-mpd
   homepage: http://search.cpan.org/dist/POE-Component-Client-MPD
   repository: http://github.com/jquelin/poe-component-client-mpd
-version: 0.9.6
+version: 1.093320

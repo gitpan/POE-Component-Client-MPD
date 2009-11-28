@@ -11,99 +11,82 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Commands;
-our $VERSION = '0.9.6';
+our $VERSION = '1.093320';
 
 
 # ABSTRACT: module handling basic mpd commands
 
+use Moose;
+use MooseX::Has::Sugar;
 use POE;
+use Readonly;
+
 use POE::Component::Client::MPD::Message;
 
-use base qw{ Class::Accessor::Fast };
+Readonly my $K => $poe_kernel;
+
+
+# -- attributes
+
+has mpd => ( ro, required, weak_ref, );# isa=>'POE::Component::Client::MPD' );
 
 
 # -- MPD interaction: general commands
 
-#
-# event: version()
-#
-# Return mpd's version number as advertised during connection.
-# Note that mpd returns *protocol* version when connected. This
-# protocol version can differ from the real mpd version. eg, mpd
-# version 0.13.2 is "speaking" and thus advertising version 0.13.0.
-#
+
 sub _do_version {
-    my ($self, $k, $h, $msg) = @_;
-    $msg->status(1);
-    $k->post( $msg->_from, 'mpd_result', $msg, $h->{version} );
+    my ($self, $msg) = @_;
+    $msg->set_status(1);
+    $K->post( $msg->_from, 'mpd_result', $msg, $self->mpd->version );
 }
 
 
-#
-# event: kill()
-#
-# Kill the mpd server, and request the pococm to be shutdown.
-#
+
 sub _do_kill {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'kill' ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
-    $k->delay_set('disconnect'=>1);
+    $msg->_set_commands ( [ 'kill' ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
+    $K->delay_set('disconnect'=>1);
 }
 
 
-#
-# event: updatedb( [$path] )
-#
-# Force mpd to rescan its collection. If $path (relative to MPD's music
-# directory) is supplied, MPD will only scan it - otherwise, MPD will rescan
-# its whole collection.
-#
+
 sub _do_updatedb {
-    my ($self, $k, $h, $msg) = @_;
-    my $path = $msg->params->[0] // '';
+    my ($self, $msg) = @_;
+    my $path = $msg->params->[0] // '';  # FIXME: padre//
 
-    $msg->_commands( [ qq{update "$path"} ] );
-    $msg->_cooking ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands( [ qq{update "$path"} ] );
+    $msg->_set_cooking ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: urlhandlers()
-#
-# Return an array of supported URL schemes.
-#
-sub _do_urlhandlers {
-    my ($self, $k, $h, $msg) = @_;
 
-    $msg->_commands ( [ 'urlhandlers' ] );
-    $msg->_cooking  ( $STRIP_FIRST );
-    $k->post( $h->{socket}, 'send', $msg );
+sub _do_urlhandlers {
+    my ($self, $msg) = @_;
+
+    $msg->_set_commands ( [ 'urlhandlers' ] );
+    $msg->_set_cooking  ( 'strip_first' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 # -- MPD interaction: handling volume & output
 
-#
-# event: volume( $volume )
-#
-# Sets the audio output volume percentage to absolute $volume.
-# If $volume is prefixed by '+' or '-' then the volume is changed relatively
-# by that value.
-#
+
+
 sub _do_volume {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my $volume;
     if ( $msg->params->[0] =~ /^(-|\+)(\d+)/ ) {
         my ($op, $delta) = ($1, $2);
         if ( not defined $msg->_data ) {
             # no status yet - fire an event
-            $msg->_post( 'volume' );
-            $h->{mpd}->_dispatch($k, $h, 'status', $msg);
+            $msg->_set_post( 'volume' );
+            $self->mpd->_dispatch('status', $msg);
             return;
         }
 
@@ -114,137 +97,100 @@ sub _do_volume {
         $volume = $msg->params->[0];
     }
 
-    $msg->_commands ( [ "setvol $volume" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ "setvol $volume" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: output_enable( $output )
-#
-# Enable the specified audio output. $output is the ID of the audio output.
-#
+
 sub _do_output_enable {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $output = $msg->params->[0];
 
-    $msg->_commands ( [ "enableoutput $output" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ "enableoutput $output" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: output_disable( $output )
-#
-# Disable the specified audio output. $output is the ID of the audio output.
-#
+
 sub _do_output_disable {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $output = $msg->params->[0];
 
-    $msg->_commands ( [ "disableoutput $output" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ "disableoutput $output" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 
 # -- MPD interaction: retrieving info from current state
 
-#
-# event: stats()
-#
-# Return an Audio::MPD::Common::Stats object with the current statistics
-# of MPD.
-#
+
 sub _do_stats {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'stats' ] );
-    $msg->_cooking  ( $AS_KV );
-    $msg->_transform( $AS_STATS );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'stats' ] );
+    $msg->_set_cooking  ( 'as_kv' );
+    $msg->_set_transform( 'as_stats' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: status()
-#
-# Return an Audio::MPD::Common::Status object the current status of MPD.
-#
+
 sub _do_status {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'status' ] );
-    $msg->_cooking  ( $AS_KV );
-    $msg->_transform( $AS_STATUS );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'status' ] );
+    $msg->_set_cooking  ( 'as_kv' );
+    $msg->_set_transform( 'as_status' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 
-#
-# event: current()
-#
-# Return an Audio::MPD::Common::Item::Song representing the song
-# currently playing.
-#
 sub _do_current {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'currentsong' ] );
-    $msg->_cooking  ( $AS_ITEMS );
-    $msg->_transform( $AS_SCALAR );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'currentsong' ] );
+    $msg->_set_cooking  ( 'as_items' );
+    $msg->_set_transform( 'as_scalar' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: song( [$song] )
-#
-# Return an Audio::MPD::Common::Item::Song representing the song number
-# $song. If $song is not supplied, returns the current song.
-#
+
 sub _do_song {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $song = $msg->params->[0];
 
-    $msg->_commands ( [ defined $song ? "playlistinfo $song" : 'currentsong' ] );
-    $msg->_cooking  ( $AS_ITEMS );
-    $msg->_transform( $AS_SCALAR );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ defined $song ? "playlistinfo $song" : 'currentsong' ] );
+    $msg->_set_cooking  ( 'as_items' );
+    $msg->_set_transform( 'as_scalar' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: songid( [$songid] )
-#
-# Return an Audio::MPD::Common::Item::Song representing the song id
-# $songid. If $songid is not supplied, returns the current song.
-#
+
 sub _do_songid {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
     my $song = $msg->params->[0];
 
-    $msg->_commands ( [ defined $song ? "playlistid $song" : 'currentsong' ] );
-    $msg->_cooking  ( $AS_ITEMS );
-    $msg->_transform( $AS_SCALAR );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ defined $song ? "playlistid $song" : 'currentsong' ] );
+    $msg->_set_cooking  ( 'as_items' );
+    $msg->_set_transform( 'as_scalar' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
 # -- MPD interaction: altering settings
 
-#
-# event: repeat( [$repeat] )
-#
-# Set the repeat mode to $repeat (1 or 0). If $repeat is not specified then
-# the repeat mode is toggled.
-#
+
+
 sub _do_repeat {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my $mode = $msg->params->[0];
     if ( defined $mode )  {
@@ -252,44 +198,34 @@ sub _do_repeat {
     } else {
         if ( not defined $msg->_data ) {
             # no status yet - fire an event
-            $msg->_post( 'repeat' );
-            $h->{mpd}->_dispatch($k, $h, 'status', $msg);
+            $msg->_set_post( 'repeat' );
+            $self->mpd->_dispatch('status', $msg);
             return;
         }
 
         $mode = $msg->_data->repeat ? 0 : 1; # negate current value
     }
 
-    $msg->_cooking ( $RAW );
-    $msg->_commands( [ "repeat $mode" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking ( 'raw' );
+    $msg->_set_commands( [ "repeat $mode" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: fade( [$seconds] )
-#
-# Enable crossfading and set the duration of crossfade between songs. If
-# $seconds is not specified or $seconds is 0, then crossfading is disabled.
-#
+
 sub _do_fade {
-    my ($self, $k, $h, $msg) = @_;
-    my $seconds = $msg->params->[0] // 0;
+    my ($self, $msg) = @_;
+    my $seconds = $msg->params->[0] // 0;  # FIXME: padre//
 
-    $msg->_commands ( [ "crossfade $seconds" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ "crossfade $seconds" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: random( [$random] )
-#
-# Set the random mode to $random (1 or 0). If $random is not specified then
-# the random mode is toggled.
-#
+
 sub _do_random {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my $mode = $msg->params->[0];
     if ( defined $mode )  {
@@ -297,174 +233,133 @@ sub _do_random {
     } else {
         if ( not defined $msg->_data ) {
             # no status yet - fire an event
-            $msg->_post( 'random' );
-            $h->{mpd}->_dispatch($k, $h, 'status', $msg);
+            $msg->_set_post( 'random' );
+            $self->mpd->_dispatch('status', $msg);
             return;
         }
 
         $mode = $msg->_data->random ? 0 : 1; # negate current value
     }
 
-    $msg->_cooking ( $RAW );
-    $msg->_commands( [ "random $mode" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking ( 'raw' );
+    $msg->_set_commands( [ "random $mode" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
-
 
 
 # -- MPD interaction: controlling playback
 
-#
-# event: play( [$song] )
-#
-# Begin playing playlist at song number $song. If no argument supplied,
-# resume playing.
-#
+
 sub _do_play {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    my $number = $msg->params->[0] // '';
-    $msg->_commands ( [ "play $number" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    my $number = $msg->params->[0] // ''; # FIXME: padre//
+    $msg->_set_commands ( [ "play $number" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: playid( [$song] )
-#
-# Begin playing playlist at song ID $song. If no argument supplied,
-# resume playing.
-#
+
 sub _do_playid {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    my $number = $msg->params->[0] // '';
-    $msg->_commands ( [ "playid $number" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    my $number = $msg->params->[0] // ''; # FIXME: padre//
+    $msg->_set_commands ( [ "playid $number" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: pause( [$sate] )
-#
-# Pause playback. If $state is 0 then the current track is unpaused, if
-# $state is 1 then the current track is paused.
-#
-# Note that if $state is not given, pause state will be toggled.
-#
+
 sub _do_pause {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    my $state = $msg->params->[0] // '';
-    $msg->_commands ( [ "pause $state" ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    my $state = $msg->params->[0] // '';  # FIXME: padre//
+    $msg->_set_commands ( [ "pause $state" ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: stop()
-#
-# Stop playback.
-#
+
 sub _do_stop {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'stop' ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'stop' ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: next()
-#
-# Play next song in playlist.
-#
+
 sub _do_next {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'next' ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'next' ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: prev()
-#
-# Play previous song in playlist.
-#
+
 sub _do_prev {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
-    $msg->_commands ( [ 'previous' ] );
-    $msg->_cooking  ( $RAW );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_commands ( [ 'previous' ] );
+    $msg->_set_cooking  ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: seek( $time, [$song] )
-#
-# Seek to $time seconds in song number $song. If $song number is not specified
-# then the perl module will try and seek to $time in the current song.
-#
+
 sub _do_seek {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my ($time, $song) = @{ $msg->params }[0,1];
     $time ||= 0; $time = int $time;
     if ( not defined $song )  {
         if ( not defined $msg->_data ) {
             # no status yet - fire an event
-            $msg->_post( 'seek' );
-            $h->{mpd}->_dispatch($k, $h, 'status', $msg);
+            $msg->_set_post( 'seek' );
+            $self->mpd->_dispatch('status', $msg);
             return;
         }
 
         $song = $msg->_data->song;
     }
 
-    $msg->_cooking ( $RAW );
-    $msg->_commands( [ "seek $song $time" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking ( 'raw' );
+    $msg->_set_commands( [ "seek $song $time" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
-#
-# event: seekid( $time, [$songid] )
-#
-# Seek to $time seconds in song ID $songid. If $songid number is not specified
-# then the perl module will try and seek to $time in the current song.
-#
+
 sub _do_seekid {
-    my ($self, $k, $h, $msg) = @_;
+    my ($self, $msg) = @_;
 
     my ($time, $songid) = @{ $msg->params }[0,1];
     $time ||= 0; $time = int $time;
     if ( not defined $songid )  {
         if ( not defined $msg->_data ) {
             # no status yet - fire an event
-            $msg->_post( 'seekid' );
-            $h->{mpd}->_dispatch($k, $h, 'status', $msg);
+            $msg->_set_post( 'seekid' );
+            $self->mpd->_dispatch('status', $msg);
             return;
         }
 
         $songid = $msg->_data->songid;
     }
 
-    $msg->_cooking ( $RAW );
-    $msg->_commands( [ "seekid $songid $time" ] );
-    $k->post( $h->{socket}, 'send', $msg );
+    $msg->_set_cooking ( 'raw' );
+    $msg->_set_commands( [ "seekid $songid $time" ] );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
-
+no Moose;
+__PACKAGE__->meta->make_immutable;
 1;
-
-
 
 
 =pod
@@ -475,7 +370,7 @@ POE::Component::Client::MPD::Commands - module handling basic mpd commands
 
 =head1 VERSION
 
-version 0.9.6
+version 1.093320
 
 =head1 DESCRIPTION
 
@@ -490,157 +385,135 @@ or methods from this module directly.
 
 Read POCOCM's pod to learn how to deal with answers from those commands.
 
-=head1 PUBLIC EVENTS
+Following is a list of general purpose events accepted by POCOCM.
 
-The following is a list of general purpose events accepted by POCOCM.
+=head1 CONTROLLING THE SERVER
 
-=head2 General commands
-
-=over 4
-
-=item * version()
+=head2 version( )
 
 Return mpd's version number as advertised during connection. Note that
 mpd returns B<protocol> version when connected. This protocol version can
 differ from the real mpd version. eg, mpd version 0.13.2 is "speaking"
 and thus advertising version 0.13.0.
 
-=item * kill()
+=head2 kill( )
 
 Kill the mpd server, and request the pococm to be shutdown.
 
-=item * updatedb( [$path] )
+=head2 updatedb( [$path] )
 
 Force mpd to rescan its collection. If C<$path> (relative to MPD's music
 directory) is supplied, MPD will only scan it - otherwise, MPD will
 rescan its whole collection.
 
-=item * urlhandlers()
+=head2 urlhandlers( )
 
 Return an array of supported URL schemes.
 
-=back 
+=head1 HANDLING VOLUME & OUTPUT
 
-=head2 Handling volume & output
-
-=over 4
-
-=item * volume( $volume )
+=head2 volume( $volume )
 
 Sets the audio output volume percentage to absolute C<$volume>. If
 C<$volume> is prefixed by '+' or '-' then the volume is changed
 relatively by that value.
 
-=item * output_enable( $output )
+=head2 output_enable( $output )
 
 Enable the specified audio output. C<$output> is the ID of the audio
 output.
 
-=item * output_disable( $output )
+=head2 output_disable( $output )
 
 Disable the specified audio output. C<$output> is the ID of the audio output.
 
-=back 
+=head1 RETRIEVING INFO FROM CURRENT STATE
 
-=head2 Retrieving info from current state
-
-=over 4
-
-=item * stats()
+=head2 stats( )
 
 Return an L<Audio::MPD::Common::Stats> object with the current
 statistics of MPD.
 
-=item * status ()
+=head2 status( )
 
 Return an L<Audio::MPD::Common::Status> object with the current
 status of MPD.
 
-=item * current()
+=head2 current( )
 
 Return an L<Audio::MPD::Common::Item::Song> representing the song
 currently playing.
 
-=item * song( [$song] )
+=head2 song( [$song] )
 
 Return an L<Audio::MPD::Common::Item::Song> representing the song number
 C<$song>. If C<$song> is not supplied, returns the current song.
 
-=item * songid( [$songid] )
+=head2 songid( [$songid] )
 
 Return an L<Audio::MPD::Common::Item::Song> representing the song id
 C<$songid>. If C<$songid> is not supplied, returns the current song.
 
-=back 
+=head1 ALTERING MPD SETTINGS
 
-=head2 Altering settings
-
-=over 4
-
-=item * repeat( [$repeat] )
+=head2 repeat( [$repeat] )
 
 Set the repeat mode to C<$repeat> (1 or 0). If C<$repeat> is not
 specified then the repeat mode is toggled.
 
-=item * fade( [$seconds] )
+=head2 fade( [$seconds] )
 
 Enable crossfading and set the duration of crossfade between songs. If
 C<$seconds> is not specified or C<$seconds> is 0, then crossfading is
 disabled.
 
-=item * random( [$random] )
+=head2 random( [$random] )
 
 Set the random mode to C<$random> (1 or 0). If C<$random> is not
 specified then the random mode is toggled.
 
-=back 
+=head1 CONTROLLING PLAYBACK
 
-=head2 Controlling playback
-
-=over 4
-
-=item * play( [$song] )
+=head2 play( [$song] )
 
 Begin playing playlist at song number C<$song>. If no argument supplied,
 resume playing.
 
-=item * playid( [$song] )
+=head2 playid( [$song] )
 
 Begin playing playlist at song ID C<$song>. If no argument supplied,
 resume playing.
 
-=item * pause( [$sate] )
+=head2 pause( [$sate] )
 
 Pause playback. If C<$state> is 0 then the current track is unpaused, if
 C<$state> is 1 then the current track is paused.
 
 Note that if C<$state> is not given, pause state will be toggled.
 
-=item * stop()
+=head2 stop( )
 
 Stop playback.
 
-=item * next()
+=head2 next( )
 
 Play next song in playlist.
 
-=item * prev()
+=head2 prev( )
 
 Play previous song in playlist.
 
-=item * seek( $time, [$song] )
+=head2 seek( $time, [$song] )
 
 Seek to C<$time> seconds in song number C<$song>. If C<$song> number is
 not specified then the perl module will try and seek to C<$time> in the
 current song.
 
-=item * seekid( $time, [$songid] )
+=head2 seekid( $time, [$songid] )
 
 Seek to C<$time> seconds in song ID C<$songid>. If C<$songid> number is
 not specified then the perl module will try and seek to C<$time> in the
 current song.
-
-=back 
 
 =head1 AUTHOR
 
@@ -653,8 +526,7 @@ This software is copyright (c) 2007 by Jerome Quelin.
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
-=cut 
-
+=cut
 
 
 __END__

@@ -11,47 +11,32 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Message;
-our $VERSION = '0.9.6';
+our $VERSION = '1.093320';
 
 
 # ABSTRACT: a message from POCOCM
 
-use Readonly;
+use Moose;
+use MooseX::Has::Sugar;
+use MooseX::SemiAffordanceAccessor;
+use MooseX::Types::Moose qw{ ArrayRef Bool Str };
 
-use base qw{ Exporter Class::Accessor::Fast };
-__PACKAGE__->mk_accessors( qw{
-    request params status
-    _data _commands _cooking _transform _post _from
-} );
+use POE::Component::Client::MPD::Types;
 
-our @EXPORT = qw{
-    $SEND $DISCARD $SLEEP1
-    $RAW $AS_ITEMS $AS_KV $STRIP_FIRST
-    $AS_SCALAR $AS_STATS $AS_STATUS
-};
+has request => ( ro, required, isa=>'Maybe[Str]' );
+has params  => ( ro, required, isa=>ArrayRef );
+has status  => ( rw, isa=>Bool );
 
+has _data      => ( rw );
+has _commands  => ( rw, isa=>ArrayRef );
+has _cooking   => ( rw, isa=>'Cooking' );
+has _transform => ( rw, isa=>'Transform' );
+has _post      => ( rw, isa=>'Maybe[Str]' );
+has _from      => ( rw, isa=>Str );
 
-# constants for _answer
-Readonly our $SEND    => 0;
-Readonly our $DISCARD => 1;
-Readonly our $SLEEP1  => 2; # for test purposes
-
-# constants for _cooking
-Readonly our $RAW         => 0; # data is to be returned raw
-Readonly our $AS_ITEMS    => 1; # data is to be returned as amc-item
-Readonly our $AS_KV       => 2; # data is to be returned as kv (hash)
-Readonly our $STRIP_FIRST => 3; # data should have its first field stripped
-
-# constants for _transform
-Readonly our $AS_SCALAR => 0; # transform data: return first elem instead of full list
-Readonly our $AS_STATS  => 1; # transform data: from kv to amc-stats
-Readonly our $AS_STATUS => 2; # transform data: from kv to amc-status
-
-
-
+no Moose;
+__PACKAGE__->meta->make_immutable;
 1;
-
-
 
 
 =pod
@@ -62,7 +47,7 @@ POE::Component::Client::MPD::Message - a message from POCOCM
 
 =head1 VERSION
 
-version 0.9.6
+version 1.093320
 
 =head1 SYNOPSIS
 
@@ -94,7 +79,7 @@ The params of the event to POCOCM, as sent by client.
 
 The status of the request. True for success, False in case of error.
 
-=back 
+=back
 
 =head1 AUTHOR
 
@@ -107,8 +92,7 @@ This software is copyright (c) 2007 by Jerome Quelin.
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
-=cut 
-
+=cut
 
 
 __END__
