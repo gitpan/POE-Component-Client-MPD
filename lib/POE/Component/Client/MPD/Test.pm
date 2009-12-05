@@ -11,9 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Test;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: automate pococ-mpd testing
 
 use Moose 0.92;
@@ -97,7 +95,7 @@ POE::Component::Client::MPD::Test - automate pococ-mpd testing
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 SYNOPSIS
 

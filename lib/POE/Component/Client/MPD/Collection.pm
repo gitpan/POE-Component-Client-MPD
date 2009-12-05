@@ -11,9 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Collection;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: module handling collection commands
 
 use Moose;
@@ -223,7 +221,7 @@ POE::Component::Client::MPD::Collection - module handling collection commands
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 DESCRIPTION
 

@@ -11,9 +11,7 @@ use warnings;
 use strict;
 
 package POE::Component::Client::MPD::Types;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: types used in the distribution
 
 use Moose::Util::TypeConstraints;
@@ -35,7 +33,7 @@ POE::Component::Client::MPD::Types - types used in the distribution
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 DESCRIPTION
 

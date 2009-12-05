@@ -11,9 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Connection;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: module handling the tcp connection with mpd
 
 use Audio::MPD::Common::Item;
@@ -314,7 +312,7 @@ POE::Component::Client::MPD::Connection - module handling the tcp connection wit
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 DESCRIPTION
 

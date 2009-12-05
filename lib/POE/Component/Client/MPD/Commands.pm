@@ -11,9 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Commands;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: module handling basic mpd commands
 
 use Moose;
@@ -370,7 +368,7 @@ POE::Component::Client::MPD::Commands - module handling basic mpd commands
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 DESCRIPTION
 

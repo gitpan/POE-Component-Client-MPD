@@ -11,9 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Message;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: a message from POCOCM
 
 use Moose;
@@ -47,7 +45,7 @@ POE::Component::Client::MPD::Message - a message from POCOCM
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 SYNOPSIS
 

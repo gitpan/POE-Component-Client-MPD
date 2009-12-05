@@ -11,9 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD;
-our $VERSION = '1.093320';
-
-
+our $VERSION = '1.093390';
 # ABSTRACT: full-blown poe-aware mpd client library
 
 use Audio::MPD::Common::Stats;
@@ -331,7 +329,7 @@ POE::Component::Client::MPD - full-blown poe-aware mpd client library
 
 =head1 VERSION
 
-version 1.093320
+version 1.093390
 
 =head1 SYNOPSIS
 
