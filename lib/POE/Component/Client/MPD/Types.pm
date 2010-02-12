@@ -11,7 +11,7 @@ use warnings;
 use strict;
 
 package POE::Component::Client::MPD::Types;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: types used in the distribution
 
 use Moose::Util::TypeConstraints;
@@ -33,7 +33,7 @@ POE::Component::Client::MPD::Types - types used in the distribution
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 DESCRIPTION
 
@@ -91,3 +91,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+

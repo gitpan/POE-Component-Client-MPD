@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Collection;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: module handling collection commands
 
 use Moose;
@@ -221,7 +221,7 @@ POE::Component::Client::MPD::Collection - module handling collection commands
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 DESCRIPTION
 
@@ -349,3 +349,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+

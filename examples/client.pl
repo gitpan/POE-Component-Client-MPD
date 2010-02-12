@@ -40,3 +40,4 @@ sub start {
 sub result {
     print "yeah!\n";
 }
+

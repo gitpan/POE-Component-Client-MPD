@@ -73,3 +73,4 @@ sub check_random_is_off { check_success($_[0]); is($_[1]->random, 0, 'random is 
 
 sub check_fade_is_on    { check_success($_[0]); is($_[1]->xfade, 15, 'enabling fading'); }
 sub check_fade_is_off   { check_success($_[0]); is($_[1]->xfade, 0,  'disabling fading by default'); }
+

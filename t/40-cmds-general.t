@@ -74,3 +74,4 @@ sub check_version {
         is($vers, $1, 'mpd version grabbed during connection is correct');
     }
 }
+

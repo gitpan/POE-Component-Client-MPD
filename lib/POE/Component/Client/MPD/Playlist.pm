@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Playlist;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: module handling playlist commands
 
 use Moose;
@@ -246,7 +246,7 @@ POE::Component::Client::MPD::Playlist - module handling playlist commands
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 DESCRIPTION
 
@@ -292,11 +292,11 @@ Remove song C<$number> (starting from 0) from the current playlist.
 Remove the specified C<$songid> (as assigned by mpd when inserted in
 playlist) from the current playlist.
 
-=head2 clear( )
+=head2 pl.clear( )
 
 Remove all the songs from the current playlist.
 
-=head2 crop( )
+=head2 pl.crop( )
 
 Remove all of the songs from the current playlist *except* the current one.
 
@@ -354,3 +354,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+

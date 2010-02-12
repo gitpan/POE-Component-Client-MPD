@@ -60,3 +60,5 @@ sub check_song_partial {
     isa_ok($_, 'Audio::MPD::Common::Item::Song', 'songs_with_filename_partial() return') for @$items;
     like($items->[0]->file, qr/album/, 'songs_with_filename_partial() return the correct song');
 }
+
+

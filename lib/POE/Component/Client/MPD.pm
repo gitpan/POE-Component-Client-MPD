@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: full-blown poe-aware mpd client library
 
 use Audio::MPD::Common::Stats;
@@ -140,7 +140,7 @@ event _default => sub {
 
     # check if event is handled.
     my @events_commands = qw{
-        version kill updatedb urlhandlers
+        password version kill updatedb urlhandlers
         volume output_enable output_disable
         stats status current song songid
         repeat fade random
@@ -193,18 +193,18 @@ event disconnect => sub {
 #
 # event: mpd_connect_error_retriable( $reason )
 # event: mpd_connect_error_fatal( $reason )
-event mpd_connect_error_retriable => \&_onprot_mpd_connect_error;
-event mpd_connect_error_fatal     => \&_onprot_mpd_connect_error;
+event mpd_connect_error_retriable => \&_mpd_connect_error;
+event mpd_connect_error_fatal     => \&_mpd_connect_error;
 
 # Called when pococm-conn could not connect to a mpd server. It can be
 # either retriable, or fatal. In bth case, we just need to forward the
 # error to our peer session.
 #
-sub _onprot_mpd_connect_error {
+sub _mpd_connect_error {
     my ($self, $reason) = @_[OBJECT, ARG0];
 
     return unless $self->has_peer;
-    $K->post($self->status_msgs_to, 'mpd_connect_error_fatal', $reason);
+    $K->post($self->status_msgs_to, 'mpd_connect_error', $reason);
 }
 
 
@@ -219,7 +219,7 @@ event mpd_connected => sub {
 
     return unless $self->has_peer;
     $K->post($self->status_msgs_to, 'mpd_connected');
-    # FIXME: send password information to mpd
+    $K->yield(password => $self->password) if $self->password;
     # FIXME: send status information to peer
 };
 
@@ -329,7 +329,7 @@ POE::Component::Client::MPD - full-blown poe-aware mpd client library
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 SYNOPSIS
 
@@ -491,7 +491,7 @@ are fired to this peer by pococm:
 
 =over 4
 
-=item * mpd_connect_error_fatal( $reason )
+=item * mpd_connect_error( $reason )
 
 Called when pococm-conn could not connect to a mpd server. It can be
 either retriable, or fatal. Check C<$reason> for more information.
@@ -558,3 +558,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+

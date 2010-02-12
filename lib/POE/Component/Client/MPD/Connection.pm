@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Connection;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: module handling the tcp connection with mpd
 
 use Audio::MPD::Common::Item;
@@ -69,14 +69,16 @@ sub disconnect {
 
 
 sub send {
-    my ($h, $msg) = @_[HEAP, ARG0];
-    # $_[HEAP]->{server} is a reserved slot of pococ-tcp.
-    # note: calls to $h->{server}->put can fail with "no such method
-    #       put". this happens when trying to send data over wires
-    #       before having received the Connected event
-    # FIXME: really implement some offline mode
-    $h->{server}->put( @{ $msg->_commands } );
-    push @{ $h->{fifo} }, $msg;
+    my ($k, $h, $msg) = @_[KERNEL, HEAP, ARG0];
+    # Test to see if we're currently connected to MPD...
+    if ($h->{connected}) {
+        # ... if we are, it's all good, so send messages ...
+        $h->{server}->put( @{ $msg->_commands } );
+        push @{ $h->{fifo} }, $msg;
+    } elsif ($h->{auto_reconnect} == 1) {
+        # ... and if not, retry the send in 2 seconds.
+        $k->delay_set(send => 2, $msg);
+    }
 }
 
 
@@ -312,7 +314,7 @@ POE::Component::Client::MPD::Connection - module handling the tcp connection wit
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 DESCRIPTION
 
@@ -428,3 +430,5 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+
+

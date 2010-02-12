@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Test;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: automate pococ-mpd testing
 
 use Moose 0.92;
@@ -95,7 +95,7 @@ POE::Component::Client::MPD::Test - automate pococ-mpd testing
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 SYNOPSIS
 
@@ -177,3 +177,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+

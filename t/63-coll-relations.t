@@ -116,3 +116,4 @@ sub check_songs_with_title_partial {
     isa_ok($_, 'Audio::MPD::Common::Item::Song', 'songs_with_title_partial() return') for @$items;
     like($items->[0]->title, qr/title/, 'songs_with_title_partial() return correct objects');
 }
+

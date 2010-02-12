@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Commands;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: module handling basic mpd commands
 
 use Moose;
@@ -36,6 +36,16 @@ sub _do_version {
     my ($self, $msg) = @_;
     $msg->set_status(1);
     $K->post( $msg->_from, 'mpd_result', $msg, $self->mpd->version );
+}
+
+
+
+sub _do_password {
+    my ($self, $msg) = @_;
+    my $pw = $msg->params->[0];
+    $msg->_set_commands( [ qq{password $pw} ] );
+    $msg->_set_cooking ( 'raw' );
+    $self->mpd->_send_to_mpd( $msg );
 }
 
 
@@ -368,7 +378,7 @@ POE::Component::Client::MPD::Commands - module handling basic mpd commands
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 DESCRIPTION
 
@@ -393,6 +403,11 @@ Return mpd's version number as advertised during connection. Note that
 mpd returns B<protocol> version when connected. This protocol version can
 differ from the real mpd version. eg, mpd version 0.13.2 is "speaking"
 and thus advertising version 0.13.0.
+
+=head2 password( $password )
+
+Sends a connection password to mpd. Used internally on connect, but can
+be called whenever if you're feeling like it.
 
 =head2 kill( )
 
@@ -528,3 +543,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+

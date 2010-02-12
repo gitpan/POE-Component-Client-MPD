@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Message;
-our $VERSION = '1.093390';
+our $VERSION = '1.100430';
 # ABSTRACT: a message from POCOCM
 
 use Moose;
@@ -45,7 +45,7 @@ POE::Component::Client::MPD::Message - a message from POCOCM
 
 =head1 VERSION
 
-version 1.093390
+version 1.100430
 
 =head1 SYNOPSIS
 
@@ -94,3 +94,4 @@ the same terms as the Perl 5 programming language system itself.
 
 
 __END__
+
