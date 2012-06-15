@@ -1,17 +1,19 @@
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 use 5.010;
 use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Connection;
-our $VERSION = '1.100430';
+{
+  $POE::Component::Client::MPD::Connection::VERSION = '1.121670';
+}
 # ABSTRACT: module handling the tcp connection with mpd
 
 use Audio::MPD::Common::Item;
@@ -314,7 +316,7 @@ POE::Component::Client::MPD::Connection - module handling the tcp connection wit
 
 =head1 VERSION
 
-version 1.100430
+version 1.121670
 
 =head1 DESCRIPTION
 
@@ -417,7 +419,7 @@ answered with the error message C<$errstr>.
 
 =head1 AUTHOR
 
-  Jerome Quelin
+Jerome Quelin
 
 =head1 COPYRIGHT AND LICENSE
 

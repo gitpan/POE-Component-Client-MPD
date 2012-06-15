@@ -1,12 +1,12 @@
 #!perl
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 
 use 5.010;
 use strict;
@@ -68,9 +68,9 @@ sub check_stats {
     isa_ok($stats, 'Audio::MPD::Common::Stats', 'stats() return');
     is($stats->artists,         1, 'one artist in the database');
     is($stats->albums,          1, 'one album in the database');
-    is($stats->songs,           4, '4 songs in the database');
+    is($stats->songs,           5, '5 songs in the database');
     is($stats->playtime,        0, 'already played 0 seconds');
-    is($stats->db_playtime,     8, '8 seconds worth of music in the db');
+    is($stats->db_playtime,    10, '10 seconds worth of music in the db');
     isnt($stats->uptime,    undef, 'uptime is defined');
     isnt($stats->db_update,     0, 'database has been updated');
 }

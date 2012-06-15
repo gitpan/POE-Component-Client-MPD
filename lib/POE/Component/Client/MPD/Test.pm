@@ -1,17 +1,19 @@
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 use 5.010;
 use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Test;
-our $VERSION = '1.100430';
+{
+  $POE::Component::Client::MPD::Test::VERSION = '1.121670';
+}
 # ABSTRACT: automate pococ-mpd testing
 
 use Moose 0.92;
@@ -95,7 +97,7 @@ POE::Component::Client::MPD::Test - automate pococ-mpd testing
 
 =head1 VERSION
 
-version 1.100430
+version 1.121670
 
 =head1 SYNOPSIS
 
@@ -164,7 +166,7 @@ L<POE::Component::Client::MPD::Message> param.
 
 =head1 AUTHOR
 
-  Jerome Quelin
+Jerome Quelin
 
 =head1 COPYRIGHT AND LICENSE
 

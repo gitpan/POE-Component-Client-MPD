@@ -1,12 +1,12 @@
 #!perl
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 
 use 5.010;
 use strict;
@@ -79,6 +79,6 @@ sub check_all_titles {
 sub check_all_files {
     my ($msg, $items) = @_;
     check_success($msg);
-    is(scalar @$items, 4, 'all_files() return the pathes');
+    is(scalar @$items, 5, 'all_files() return the pathes');
     like($items->[0], qr/\.ogg$/, 'all_files() return strings');
 }

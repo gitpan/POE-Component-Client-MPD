@@ -1,17 +1,19 @@
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 use 5.010;
 use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Collection;
-our $VERSION = '1.100430';
+{
+  $POE::Component::Client::MPD::Collection::VERSION = '1.121670';
+}
 # ABSTRACT: module handling collection commands
 
 use Moose;
@@ -221,7 +223,7 @@ POE::Component::Client::MPD::Collection - module handling collection commands
 
 =head1 VERSION
 
-version 1.100430
+version 1.121670
 
 =head1 DESCRIPTION
 
@@ -336,7 +338,7 @@ of the title.
 
 =head1 AUTHOR
 
-  Jerome Quelin
+Jerome Quelin
 
 =head1 COPYRIGHT AND LICENSE
 

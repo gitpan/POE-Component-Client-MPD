@@ -1,12 +1,12 @@
 #!perl
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 
 use 5.010;
 use strict;
@@ -173,9 +173,9 @@ sub check_next    { check_success($_[0]); is($_[1]->song,   1,       'prev() cha
 sub check_seek1 {
     my ($msg, $status) = @_;
     check_success($msg);
-    is($status->song, 2, 'seek() can change the current track');
     SKIP: {
-        skip "detection method doesn't always work - depends on timing", 1;
+        skip "detection method doesn't always work - depends on timing", 2;
+        is($status->song, 2, 'seek() can change the current track');
         is($status->time->sofar_secs, 1, 'seek() seeks in the song');
     }
 }

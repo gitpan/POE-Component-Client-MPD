@@ -1,17 +1,19 @@
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 use 5.010;
 use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Playlist;
-our $VERSION = '1.100430';
+{
+  $POE::Component::Client::MPD::Playlist::VERSION = '1.121670';
+}
 # ABSTRACT: module handling playlist commands
 
 use Moose;
@@ -246,7 +248,7 @@ POE::Component::Client::MPD::Playlist - module handling playlist commands
 
 =head1 VERSION
 
-version 1.100430
+version 1.121670
 
 =head1 DESCRIPTION
 
@@ -341,7 +343,7 @@ Delete playlist named C<$playlist> from MPD's playlist directory.
 
 =head1 AUTHOR
 
-  Jerome Quelin
+Jerome Quelin
 
 =head1 COPYRIGHT AND LICENSE
 

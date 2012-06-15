@@ -2,6 +2,7 @@ Build.PL
 Changes
 LICENSE
 MANIFEST
+META.json
 META.yml
 README
 TODO
@@ -16,6 +17,7 @@ lib/POE/Component/Client/MPD/Playlist.pm
 lib/POE/Component/Client/MPD/Test.pm
 lib/POE/Component/Client/MPD/Types.pm
 t/00-compile.t
+t/000-report-versions-tiny.t
 t/20-conn-failed.t
 t/21-conn-non_mpd.t
 t/23-conn-dialog.t
@@ -33,8 +35,9 @@ t/60-coll-retrieve.t
 t/61-coll-whole.t
 t/62-coll-pick.t
 t/63-coll-relations.t
-t/author-critic.t
-t/release-meta-yaml.t
+t/release-has-version.t
+t/release-kwalitee.t
+t/release-minimum-version.t
 t/release-pod-coverage.t
 t/release-pod-syntax.t
 weaver.ini

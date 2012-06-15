@@ -1,17 +1,19 @@
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 use 5.010;
 use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Message;
-our $VERSION = '1.100430';
+{
+  $POE::Component::Client::MPD::Message::VERSION = '1.121670';
+}
 # ABSTRACT: a message from POCOCM
 
 use Moose;
@@ -45,7 +47,7 @@ POE::Component::Client::MPD::Message - a message from POCOCM
 
 =head1 VERSION
 
-version 1.100430
+version 1.121670
 
 =head1 SYNOPSIS
 
@@ -81,7 +83,7 @@ The status of the request. True for success, False in case of error.
 
 =head1 AUTHOR
 
-  Jerome Quelin
+Jerome Quelin
 
 =head1 COPYRIGHT AND LICENSE
 

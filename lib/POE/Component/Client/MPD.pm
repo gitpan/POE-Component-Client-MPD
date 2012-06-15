@@ -1,17 +1,19 @@
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 use 5.010;
 use strict;
 use warnings;
 
 package POE::Component::Client::MPD;
-our $VERSION = '1.100430';
+{
+  $POE::Component::Client::MPD::VERSION = '1.121670';
+}
 # ABSTRACT: full-blown poe-aware mpd client library
 
 use Audio::MPD::Common::Stats;
@@ -329,7 +331,7 @@ POE::Component::Client::MPD - full-blown poe-aware mpd client library
 
 =head1 VERSION
 
-version 1.100430
+version 1.121670
 
 =head1 SYNOPSIS
 
@@ -545,7 +547,7 @@ L<http://cpanratings.perl.org/d/POE-Component-Client-MPD>
 
 =head1 AUTHOR
 
-  Jerome Quelin
+Jerome Quelin
 
 =head1 COPYRIGHT AND LICENSE
 

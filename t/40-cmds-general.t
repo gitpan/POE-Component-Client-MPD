@@ -1,12 +1,12 @@
 #!perl
-# 
+#
 # This file is part of POE-Component-Client-MPD
-# 
+#
 # This software is copyright (c) 2007 by Jerome Quelin.
-# 
+#
 # This is free software; you can redistribute it and/or modify it under
 # the same terms as the Perl 5 programming language system itself.
-# 
+#
 
 use 5.010;
 use strict;
@@ -62,7 +62,7 @@ sub check_update  {
 sub check_urlhandlers {
     my ($msg, $handlers) = @_;
     check_success($msg);
-    is(scalar @$handlers, 1, 'no url handler supported by default');
+    ok( scalar @$handlers >= 1, 'at least one url handler supported' );
 }
 
 sub check_version {
