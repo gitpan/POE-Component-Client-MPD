@@ -11,11 +11,8 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Message;
-{
-  $POE::Component::Client::MPD::Message::VERSION = '1.121670';
-}
 # ABSTRACT: a message from POCOCM
-
+$POE::Component::Client::MPD::Message::VERSION = '2.000';
 use Moose;
 use MooseX::Has::Sugar;
 use MooseX::SemiAffordanceAccessor;
@@ -38,6 +35,7 @@ no Moose;
 __PACKAGE__->meta->make_immutable;
 1;
 
+__END__
 
 =pod
 
@@ -47,7 +45,7 @@ POE::Component::Client::MPD::Message - a message from POCOCM
 
 =head1 VERSION
 
-version 1.121670
+version 2.000
 
 =head1 SYNOPSIS
 
@@ -93,7 +91,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-
-__END__
-

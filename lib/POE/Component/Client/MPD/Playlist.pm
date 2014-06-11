@@ -11,11 +11,8 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Playlist;
-{
-  $POE::Component::Client::MPD::Playlist::VERSION = '1.121670';
-}
 # ABSTRACT: module handling playlist commands
-
+$POE::Component::Client::MPD::Playlist::VERSION = '2.000';
 use Moose;
 use MooseX::Has::Sugar;
 use POE;
@@ -239,6 +236,7 @@ no Moose;
 __PACKAGE__->meta->make_immutable;
 1;
 
+__END__
 
 =pod
 
@@ -248,7 +246,7 @@ POE::Component::Client::MPD::Playlist - module handling playlist commands
 
 =head1 VERSION
 
-version 1.121670
+version 2.000
 
 =head1 DESCRIPTION
 
@@ -353,7 +351,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-
-__END__
-

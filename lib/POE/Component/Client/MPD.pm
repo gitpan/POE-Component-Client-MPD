@@ -11,14 +11,12 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD;
-{
-  $POE::Component::Client::MPD::VERSION = '1.121670';
-}
 # ABSTRACT: full-blown poe-aware mpd client library
-
+$POE::Component::Client::MPD::VERSION = '2.000';
 use Audio::MPD::Common::Stats;
 use Audio::MPD::Common::Status;
 use Carp;
+use List::AllUtils qw{ any };
 use Moose;
 use MooseX::Has::Sugar;
 use MooseX::POE;
@@ -96,24 +94,18 @@ sub _dispatch {
     my ($self, $event, $msg) = @_;
 
     # dispatch the event.
-    given ($event) {
+    if ( $event =~ /^pl\.(.*)$/ ) {
         # playlist commands
-        when (/^pl\.(.*)$/) {
-            my $meth = "_do_$1";
-            $self->_playlist->$meth($msg);
-        }
-
+        my $meth = "_do_$1";
+        $self->_playlist->$meth($msg);
+    } elsif ( $event =~ /^coll\.(.*)$/ ) {
         # collection commands
-        when (/^coll\.(.*)$/) {
-            my $meth = "_do_$1";
-            $self->_collection->$meth($msg);
-        }
-
+        my $meth = "_do_$1";
+        $self->_collection->$meth($msg);
+    } else {
         # basic commands
-        default {
-            my $meth = "_do_$event";
-            $self->_commands->$meth($msg);
-        }
+        my $meth = "_do_$event";
+        $self->_commands->$meth($msg);
     }
 }
 
@@ -163,7 +155,7 @@ event _default => sub {
             coll.songs_with_title coll.songs_with_title_partial
     };
     my @ok_events = ( @events_commands, @events_playlist, @events_collection );
-    return unless $event ~~ [ @ok_events ];
+    return unless any { $event eq $_ } @ok_events;
 
     # create the message that will hold
     my $msg = POE::Component::Client::MPD::Message->new( {
@@ -249,21 +241,19 @@ event mpd_data => sub {
     my ($self, $msg) = @_[OBJECT, ARG0];
 
     # transform data if needed.
-    given ($msg->_transform) {
-        when ('as_scalar') {
+    if ( defined $msg->_transform ) {
+        if ( $msg->_transform eq "as_scalar" ) {
             my $data = $msg->_data->[0];
             $msg->_set_data($data);
-        }
-        when ('as_stats') {
+        } elsif ( $msg->_transform eq "as_stats" ) {
             my %stats = @{ $msg->_data };
             my $stats = Audio::MPD::Common::Stats->new( \%stats );
             $msg->_set_data($stats);
-        }
-        when ('as_status') {
+        } elsif ( $msg->_transform eq "as_status" ) {
             my %status = @{ $msg->_data };
             my $status = Audio::MPD::Common::Status->new( \%status );
             $msg->_set_data($status);
-        };
+        }
     }
 
 
@@ -322,6 +312,7 @@ no Moose;
 __PACKAGE__->meta->make_immutable;
 1;
 
+__END__
 
 =pod
 
@@ -331,7 +322,7 @@ POE::Component::Client::MPD - full-blown poe-aware mpd client library
 
 =head1 VERSION
 
-version 1.121670
+version 2.000
 
 =head1 SYNOPSIS
 
@@ -557,7 +548,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-
-__END__
-

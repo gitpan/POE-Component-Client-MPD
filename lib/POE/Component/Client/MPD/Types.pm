@@ -11,21 +11,19 @@ use warnings;
 use strict;
 
 package POE::Component::Client::MPD::Types;
-{
-  $POE::Component::Client::MPD::Types::VERSION = '1.121670';
-}
 # ABSTRACT: types used in the distribution
-
+$POE::Component::Client::MPD::Types::VERSION = '2.000';
 use Moose::Util::TypeConstraints;
 use Sub::Exporter -setup => { exports => [ qw{
     Cooking Transform
 } ] };
 
-enum Cooking   => qw{ raw as_items as_kv strip_first };
-enum Transform => qw{ as_scalar as_stats as_status };
+enum Cooking   => [ qw{ raw as_items as_kv strip_first } ];
+enum Transform => [ qw{ as_scalar as_stats as_status } ];
 
 1;
 
+__END__
 
 =pod
 
@@ -35,7 +33,7 @@ POE::Component::Client::MPD::Types - types used in the distribution
 
 =head1 VERSION
 
-version 1.121670
+version 2.000
 
 =head1 DESCRIPTION
 
@@ -90,7 +88,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-
-__END__
-

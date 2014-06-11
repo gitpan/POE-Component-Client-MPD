@@ -11,11 +11,8 @@ use strict;
 use warnings;
 
 package POE::Component::Client::MPD::Collection;
-{
-  $POE::Component::Client::MPD::Collection::VERSION = '1.121670';
-}
 # ABSTRACT: module handling collection commands
-
+$POE::Component::Client::MPD::Collection::VERSION = '2.000';
 use Moose;
 use MooseX::Has::Sugar;
 use POE;
@@ -214,6 +211,7 @@ no Moose;
 __PACKAGE__->meta->make_immutable;
 1;
 
+__END__
 
 =pod
 
@@ -223,7 +221,7 @@ POE::Component::Client::MPD::Collection - module handling collection commands
 
 =head1 VERSION
 
-version 1.121670
+version 2.000
 
 =head1 DESCRIPTION
 
@@ -348,7 +346,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-
-__END__
-
